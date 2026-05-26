@@ -24,17 +24,19 @@ For strong consistency: R + W > N
 
 ```mermaid
 graph LR
-    subgraph Write Quorum W=2
-        W1[Node 1 ✅]
-        W2[Node 2 ✅]
+    subgraph "Write Quorum (W=2)"
+        W1[Node 1 - Success]
+        W2[Node 2 - Success]
         W3[Node 3]
     end
-    subgraph Read Quorum R=2
+
+    subgraph "Read Quorum (R=2)"
         R1[Node 1]
-        R2[Node 2 ✅]
-        R3[Node 3 ✅]
+        R2[Node 2 - Success]
+        R3[Node 3 - Success]
     end
-    Note[Overlap: Node 2\nGuarantees latest value]
+
+    W2 --- Note[Overlap: Node 2<br>Guarantees latest value] --- R2
 ```
 
 **With N=3, W=2, R=2:** R + W = 4 > 3 ✓ — strong consistency guaranteed

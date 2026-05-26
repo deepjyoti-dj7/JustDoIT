@@ -40,7 +40,7 @@ key "user:456" → 789 % 4 = 1 → Server B  ✗ (was C!)
 Consistent hashing maps both servers and keys onto a **circular ring** (hash space from 0 to 2³²).
 
 ```mermaid
-flowchart TDD
+flowchart TD
     subgraph Hash Ring 0 to 2^32
         direction LR
         K1[Key A\nhash=120] -.->|next clockwise| S1[Server 1\nhash=150]
@@ -150,22 +150,42 @@ With 100+ virtual nodes per server:
 - New servers take a proportional share from all existing servers
 
 ```mermaid
-flowchart TDD
-    subgraph Physical Servers
-        A[Server A]
-        B[Server B]
-        C[Server C]
+flowchart TD
+
+    A["Server A"]
+    B["Server B"]
+    C["Server C"]
+
+    A1["A@50"]
+    A2["A@450"]
+    A3["A@900"]
+
+    B1["B@30"]
+    B2["B@380"]
+    B3["B@850"]
+
+    C1["C@80"]
+    C2["C@500"]
+    C3["C@950"]
+
+    subgraph Physical_Servers
+        A
+        B
+        C
     end
-    subgraph Ring Positions
-        A --> A1[A@50]
-        A --> A2[A@450]
-        A --> A3[A@900]
-        B --> B1[B@30]
-        B --> B2[B@380]
-        B --> B3[B@850]
-        C --> C1[C@80]
-        C --> C2[C@500]
-        C --> C3[C@950]
+
+    subgraph Ring_Positions
+        A --> A1
+        A --> A2
+        A --> A3
+
+        B --> B1
+        B --> B2
+        B --> B3
+
+        C --> C1
+        C --> C2
+        C --> C3
     end
 ```
 
