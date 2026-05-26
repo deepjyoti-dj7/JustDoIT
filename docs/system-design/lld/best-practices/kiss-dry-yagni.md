@@ -1,0 +1,1 @@
+# KISS, DRY and YAGNI
