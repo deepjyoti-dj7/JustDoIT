@@ -421,10 +421,6 @@ export const navigation: NavItem[] = [
             title: "Design Tradeoffs",
             children: [
               {
-                title: "Top 15 Tradeoffs",
-                href: "/system-design/hld/design-tradeoffs/top-15-tradeoffs",
-              },
-              {
                 title: "Consistency vs Availability",
                 href: "/system-design/hld/design-tradeoffs/consistency-vs-availability",
               },

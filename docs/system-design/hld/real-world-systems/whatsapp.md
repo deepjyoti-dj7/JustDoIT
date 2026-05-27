@@ -1,5 +1,9 @@
 # Designing WhatsApp: A Production-Scale Messaging System
 
+> **Difficulty:** Medium | **Category:** Real-Time Messaging | **Companies:** Meta, Telegram, Signal, WeChat
+
+---
+
 ## Introduction
 
 WhatsApp is the world's most widely used instant messaging platform — **2 billion+ active users**, **100 billion messages per day**, and availability in **180+ countries**. It handles text messages, images, videos, voice notes, group chats, end-to-end encryption, and real-time delivery receipts — all at planetary scale.
