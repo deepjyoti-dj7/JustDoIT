@@ -1,6 +1,7 @@
 import { useState, useRef, type ComponentType, type ReactNode } from "react";
 import { Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CodeTabs } from "@/components/ui/CodeTabs";
 
 // ── Code block with copy button ───────────────────────────────────────────────
 function Pre({ children, ...props }: React.HTMLAttributes<HTMLPreElement>) {
@@ -96,4 +97,5 @@ export const mdxComponents: Record<
   table: Table,
   th: Th,
   td: Td,
+  CodeTabs: CodeTabs as ComponentType<{ children?: ReactNode }>,
 };

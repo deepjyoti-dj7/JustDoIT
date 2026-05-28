@@ -4,19 +4,30 @@
 
 /* ── Base ─────────────────────────────────────────────────────────────────── */
 @layer base {
-  html { scroll-behavior: smooth; }
+  html {
+    scroll-behavior: smooth;
+  }
 
   body {
     @apply bg-white text-zinc-900 antialiased;
     @apply dark:bg-black dark:text-zinc-100;
   }
 
-  * { @apply border-zinc-200 dark:border-zinc-800; }
+  * {
+    @apply border-zinc-200 dark:border-zinc-800;
+  }
 
   /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { @apply rounded-full bg-zinc-300 dark:bg-zinc-700; }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-zinc-300 dark:bg-zinc-700;
+  }
 }
 
 /* ── Reading Progress Bar ─────────────────────────────────────────────────── */
@@ -29,9 +40,13 @@
 
 /* Dual theme: hide wrong theme */
 html.dark [data-theme="light"],
-html.dark [data-theme="light"] span { display: none; }
+html.dark [data-theme="light"] span {
+  display: none;
+}
 html:not(.dark) [data-theme="dark"],
-html:not(.dark) [data-theme="dark"] span { display: none; }
+html:not(.dark) [data-theme="dark"] span {
+  display: none;
+}
 
 /* Code block wrapper */
 [data-rehype-pretty-code-fragment] {
@@ -83,6 +98,19 @@ pre [data-highlighted-line] {
 }
 
 /* ── Mermaid diagrams ─────────────────────────────────────────────────────── */
+
+/* ── Code Tabs ────────────────────────────────────────────────────────────── */
+.code-tabs-panels pre {
+  @apply !rounded-t-none !mt-0 !mb-0;
+}
+.code-tabs-panels [data-rehype-pretty-code-fragment] {
+  @apply !my-0;
+}
+.code-tabs-panels .group.relative {
+  @apply !my-0;
+}
+
+/* ── Mermaid diagrams ─────────────────────────────────────────────────────── */
 .mermaid-block {
   @apply my-6 flex justify-center overflow-x-auto;
 }
@@ -92,18 +120,23 @@ pre [data-highlighted-line] {
 }
 
 /* ── Prose overrides ──────────────────────────────────────────────────────── */
-.prose h1, .prose h2, .prose h3, .prose h4 {
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
   @apply scroll-mt-20;
 }
 
-.prose h2 { @apply mt-10 border-b pb-2 dark:border-zinc-800; }
+.prose h2 {
+  @apply mt-10 border-b pb-2 dark:border-zinc-800;
+}
 
 /* Anchor heading link */
 .prose .anchor {
   @apply no-underline;
 }
 .prose .anchor::after {
-  content: ' #';
+  content: " #";
   @apply text-zinc-400 dark:text-zinc-600 opacity-0 transition-opacity;
 }
 .prose .anchor:hover::after {
