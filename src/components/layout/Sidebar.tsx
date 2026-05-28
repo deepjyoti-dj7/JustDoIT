@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { navigation, type NavItem } from "@/lib/nav";
 import { cn } from "@/lib/utils";
+import { useSidebarContext } from "./SidebarContext";
 
 interface SidebarProps {
   onNavigate?: () => void;
@@ -15,6 +16,18 @@ function hasActiveDescendant(item: NavItem, path: string): boolean {
     item.children?.some((child) => hasActiveDescendant(child, path)) ?? false
   );
 }
+
+function countLeaves(item: NavItem): number {
+  if (!item.children || item.children.length === 0) return item.href ? 1 : 0;
+  return item.children.reduce((sum, child) => sum + countLeaves(child), 0);
+}
+
+const mainSectionHrefs = new Set([
+  "/system-design",
+  "/system-design/hld",
+  "/system-design/lld",
+  "/dsa",
+]);
 
 export function Sidebar({ onNavigate }: SidebarProps) {
   const { pathname } = useLocation();
@@ -53,6 +66,17 @@ function SidebarSection({
   const [open, setOpen] = useState(
     () => isActive || hasActiveDescendant(item, currentPath),
   );
+  const { expandSection, setExpandSection } = useSidebarContext();
+
+  useEffect(() => {
+    if (!expandSection) return;
+    if (item.href === expandSection) {
+      setOpen(true);
+      setExpandSection(null);
+    } else if (hasActiveDescendant(item, expandSection)) {
+      setOpen(true);
+    }
+  }, [expandSection, item, setExpandSection]);
 
   if (!item.children) {
     // Leaf node — clickable link
@@ -76,6 +100,10 @@ function SidebarSection({
     );
   }
 
+  // Show topic count for subtopics only (not top-level or main sections like HLD/LLD/DSA)
+  const showCount = depth > 0 && !mainSectionHrefs.has(item.href ?? "");
+  const topicCount = showCount ? countLeaves(item) : 0;
+
   // Section with children
   return (
     <div className={depth > 0 ? "mt-1" : "mb-4"}>
@@ -93,11 +121,18 @@ function SidebarSection({
         }}
       >
         <span className="truncate">{item.title}</span>
-        {open ? (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
-        )}
+        <span className="flex items-center gap-1.5">
+          {showCount && topicCount > 0 && (
+            <span className="rounded-full bg-zinc-100 px-1.5 text-[10px] font-normal text-zinc-400 dark:bg-zinc-800 dark:text-zinc-500">
+              {topicCount}
+            </span>
+          )}
+          {open ? (
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+          )}
+        </span>
       </button>
 
       {open && (

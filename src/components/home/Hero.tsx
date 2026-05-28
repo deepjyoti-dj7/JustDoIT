@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
 import { ArrowRight, Layers, Database, Code2 } from "lucide-react";
+import { useSidebarContext } from "@/components/layout/SidebarContext";
 
 const sections = [
   {
@@ -32,6 +32,13 @@ const sections = [
 ];
 
 export function Hero() {
+  const { setExpandSection, openMobileSidebar } = useSidebarContext();
+
+  const handleCardClick = (href: string) => {
+    setExpandSection(href);
+    openMobileSidebar();
+  };
+
   return (
     <div className="mx-auto max-w-4xl px-6 pb-20 pt-16 xl:px-10">
       {/* Badge */}
@@ -57,10 +64,10 @@ export function Hero() {
       <div className="grid gap-4 sm:grid-cols-3">
         {sections.map(
           ({ icon: Icon, title, description, href, accent, bg }) => (
-            <Link
+            <button
               key={href}
-              to={href}
-              className="group flex flex-col gap-4 rounded-xl border border-zinc-200 p-6 transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-lg dark:border-zinc-800 dark:hover:border-zinc-700 sm:last:col-span-1"
+              onClick={() => handleCardClick(href)}
+              className="group flex flex-col gap-4 rounded-xl border border-zinc-200 p-6 text-left transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-lg dark:border-zinc-800 dark:hover:border-zinc-700 sm:last:col-span-1"
             >
               <div className={`w-fit rounded-lg p-2.5 ${bg}`}>
                 <Icon className={`h-5 w-5 ${accent}`} />
@@ -79,7 +86,7 @@ export function Hero() {
                 Explore{" "}
                 <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
               </span>
-            </Link>
+            </button>
           ),
         )}
       </div>
