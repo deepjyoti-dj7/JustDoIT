@@ -478,7 +478,7 @@ export const navigation: NavItem[] = [
             title: "Real-World Systems",
             children: [
               {
-                title: "Beginner",
+                title: "Easy",
                 children: [
                   {
                     title: "URL Shortener / TinyURL",
@@ -497,16 +497,12 @@ export const navigation: NavItem[] = [
                     href: "/system-design/hld/real-world-systems/cdn",
                   },
                   {
-                    title: "Parking Lot",
-                    href: "/system-design/hld/real-world-systems/parking-lot",
-                  },
-                  {
                     title: "UPI",
                     href: "/system-design/hld/real-world-systems/upi",
                   },
                   {
-                    title: "Vending Machine",
-                    href: "/system-design/hld/real-world-systems/vending-machine",
+                    title: "Leaderboard System",
+                    href: "/system-design/hld/real-world-systems/leaderboard-system",
                   },
                   {
                     title: "Distributed Key-Value Store",
@@ -520,10 +516,14 @@ export const navigation: NavItem[] = [
                     title: "Authentication System",
                     href: "/system-design/hld/real-world-systems/authentication-system",
                   },
+                  {
+                    title: "Splitwise",
+                    href: "/system-design/hld/real-world-systems/splitwise",
+                  },
                 ],
               },
               {
-                title: "Intermediate",
+                title: "Medium",
                 children: [
                   {
                     title: "Design WhatsApp",
@@ -621,10 +621,26 @@ export const navigation: NavItem[] = [
                     title: "Digital Wallet",
                     href: "/system-design/hld/real-world-systems/digital-wallet",
                   },
+                  {
+                    title: "Live Streaming",
+                    href: "/system-design/hld/real-world-systems/live-streaming",
+                  },
+                  {
+                    title: "Content Moderation",
+                    href: "/system-design/hld/real-world-systems/content-moderation",
+                  },
+                  {
+                    title: "Email System",
+                    href: "/system-design/hld/real-world-systems/email-system",
+                  },
+                  {
+                    title: "Logging & Metrics Pipeline",
+                    href: "/system-design/hld/real-world-systems/logging-metrics-pipeline",
+                  },
                 ],
               },
               {
-                title: "Advanced",
+                title: "Hard",
                 children: [
                   {
                     title: "Location-Based Service / Yelp",
@@ -665,6 +681,14 @@ export const navigation: NavItem[] = [
                   {
                     title: "Distributed Locking Service",
                     href: "/system-design/hld/real-world-systems/distributed-locking-service",
+                  },
+                  {
+                    title: "Stock Exchange / Trading Platform",
+                    href: "/system-design/hld/real-world-systems/stock-exchange",
+                  },
+                  {
+                    title: "Ad Platform",
+                    href: "/system-design/hld/real-world-systems/ad-platform",
                   },
                 ],
               },
@@ -948,6 +972,78 @@ export const navigation: NavItem[] = [
               {
                 title: "Premature Optimization",
                 href: "/system-design/lld/anti-patterns/premature-optimization",
+              },
+            ],
+          },
+
+          {
+            title: "Concurrency & Thread Safety",
+            children: [
+              {
+                title: "Concurrency Fundamentals",
+                href: "/system-design/lld/concurrency-thread-safety/concurrency-fundamentals",
+              },
+              {
+                title: "Synchronization Mechanisms",
+                href: "/system-design/lld/concurrency-thread-safety/synchronization-mechanisms",
+              },
+              {
+                title: "Deadlocks & Race Conditions",
+                href: "/system-design/lld/concurrency-thread-safety/deadlocks-race-conditions",
+              },
+              {
+                title: "Immutability & Thread-Safe Design",
+                href: "/system-design/lld/concurrency-thread-safety/immutability-thread-safe-design",
+              },
+              {
+                title: "Concurrent Design Patterns",
+                href: "/system-design/lld/concurrency-thread-safety/concurrent-design-patterns",
+              },
+            ],
+          },
+          {
+            title: "Error Handling & Logging",
+            children: [
+              {
+                title: "Error Handling Strategies",
+                href: "/system-design/lld/error-handling-logging/error-handling-strategies",
+              },
+              {
+                title: "Exception Design",
+                href: "/system-design/lld/error-handling-logging/exception-design",
+              },
+              {
+                title: "Logging Best Practices",
+                href: "/system-design/lld/error-handling-logging/logging-best-practices",
+              },
+              {
+                title: "Observability & Structured Logging",
+                href: "/system-design/lld/error-handling-logging/observability-structured-logging",
+              },
+            ],
+          },
+          {
+            title: "Testing",
+            children: [
+              {
+                title: "Unit Testing",
+                href: "/system-design/lld/testing/unit-testing",
+              },
+              {
+                title: "Integration Testing",
+                href: "/system-design/lld/testing/integration-testing",
+              },
+              {
+                title: "Test-Driven Development",
+                href: "/system-design/lld/testing/test-driven-development",
+              },
+              {
+                title: "Mocking and Fakes",
+                href: "/system-design/lld/testing/mocking-and-fakes",
+              },
+              {
+                title: "Testable Design",
+                href: "/system-design/lld/testing/testable-design",
               },
             ],
           },
