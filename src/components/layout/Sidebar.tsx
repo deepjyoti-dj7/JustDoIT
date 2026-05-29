@@ -93,7 +93,7 @@ function SidebarSection({
               : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100",
           )
         }
-        style={{ paddingLeft: `${0.5 + depth * 0.75}rem` }}
+        style={{ paddingLeft: `${-1 + depth * 0.75}rem` }}
       >
         {item.title}
       </NavLink>

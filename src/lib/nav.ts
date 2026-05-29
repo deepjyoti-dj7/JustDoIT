@@ -478,10 +478,10 @@ export const navigation: NavItem[] = [
             title: "Real-World Systems",
             children: [
               {
-                title: "Easy",
+                title: "Beginner",
                 children: [
                   {
-                    title: "URL Shortener / TinyURL",
+                    title: "URL Shortener",
                     href: "/system-design/hld/real-world-systems/url-shortener-tinyurl",
                   },
                   {
@@ -501,11 +501,11 @@ export const navigation: NavItem[] = [
                     href: "/system-design/hld/real-world-systems/upi",
                   },
                   {
-                    title: "Leaderboard System",
+                    title: "Leaderboard",
                     href: "/system-design/hld/real-world-systems/leaderboard-system",
                   },
                   {
-                    title: "Distributed Key-Value Store",
+                    title: "Key-Value Store",
                     href: "/system-design/hld/real-world-systems/distributed-key-value-store",
                   },
                   {
@@ -513,7 +513,7 @@ export const navigation: NavItem[] = [
                     href: "/system-design/hld/real-world-systems/distributed-cache",
                   },
                   {
-                    title: "Authentication System",
+                    title: "Authentication",
                     href: "/system-design/hld/real-world-systems/authentication-system",
                   },
                   {
@@ -523,18 +523,18 @@ export const navigation: NavItem[] = [
                 ],
               },
               {
-                title: "Medium",
+                title: "Intermediate",
                 children: [
                   {
-                    title: "Design WhatsApp",
+                    title: "WhatsApp",
                     href: "/system-design/hld/real-world-systems/whatsapp",
                   },
                   {
-                    title: "Design Instagram",
+                    title: "Instagram",
                     href: "/system-design/hld/real-world-systems/instagram",
                   },
                   {
-                    title: "Design Spotify",
+                    title: "Spotify",
                     href: "/system-design/hld/real-world-systems/spotify",
                   },
                   {
@@ -542,39 +542,39 @@ export const navigation: NavItem[] = [
                     href: "/system-design/hld/real-world-systems/notification-service",
                   },
                   {
-                    title: "Distributed Job Scheduler",
+                    title: "Job Scheduler",
                     href: "/system-design/hld/real-world-systems/distributed-job-scheduler",
                   },
                   {
-                    title: "Tinder / Hinge",
+                    title: "Tinder",
                     href: "/system-design/hld/real-world-systems/tinder-hinge",
                   },
                   {
-                    title: "Design Facebook",
+                    title: "Facebook",
                     href: "/system-design/hld/real-world-systems/facebook",
                   },
                   {
-                    title: "Design Twitter",
+                    title: "Twitter",
                     href: "/system-design/hld/real-world-systems/twitter",
                   },
                   {
-                    title: "Design Discord",
+                    title: "Discord",
                     href: "/system-design/hld/real-world-systems/discord",
                   },
                   {
-                    title: "Design Reddit",
+                    title: "Reddit",
                     href: "/system-design/hld/real-world-systems/reddit",
                   },
                   {
-                    title: "Design Netflix",
+                    title: "Netflix",
                     href: "/system-design/hld/real-world-systems/netflix",
                   },
                   {
-                    title: "Design YouTube",
+                    title: "YouTube",
                     href: "/system-design/hld/real-world-systems/youtube",
                   },
                   {
-                    title: "Design Google Search",
+                    title: "Google Search",
                     href: "/system-design/hld/real-world-systems/google-search",
                   },
                   {
@@ -582,15 +582,15 @@ export const navigation: NavItem[] = [
                     href: "/system-design/hld/real-world-systems/amazon-flipkart",
                   },
                   {
-                    title: "Design TikTok",
+                    title: "TikTok",
                     href: "/system-design/hld/real-world-systems/tiktok",
                   },
                   {
-                    title: "Design Shopify",
+                    title: "Shopify",
                     href: "/system-design/hld/real-world-systems/shopify",
                   },
                   {
-                    title: "Design Airbnb",
+                    title: "Airbnb",
                     href: "/system-design/hld/real-world-systems/airbnb",
                   },
                   {
@@ -598,11 +598,11 @@ export const navigation: NavItem[] = [
                     href: "/system-design/hld/real-world-systems/rate-limiter",
                   },
                   {
-                    title: "Distributed Message Queue / Kafka",
+                    title: "Kafka",
                     href: "/system-design/hld/real-world-systems/distributed-message-queue-kafka",
                   },
                   {
-                    title: "Flight Booking System",
+                    title: "Flight Booking",
                     href: "/system-design/hld/real-world-systems/flight-booking-system",
                   },
                   {
@@ -634,56 +634,56 @@ export const navigation: NavItem[] = [
                     href: "/system-design/hld/real-world-systems/email-system",
                   },
                   {
-                    title: "Logging & Metrics Pipeline",
+                    title: "Logging & Metrics",
                     href: "/system-design/hld/real-world-systems/logging-metrics-pipeline",
                   },
                 ],
               },
               {
-                title: "Hard",
+                title: "Advanced",
                 children: [
                   {
-                    title: "Location-Based Service / Yelp",
+                    title: "Location-Based",
                     href: "/system-design/hld/real-world-systems/location-based-service-yelp",
                   },
                   {
-                    title: "Design Uber",
+                    title: "Uber",
                     href: "/system-design/hld/real-world-systems/uber",
                   },
                   {
-                    title: "Food Delivery / Swiggy / Zomato",
+                    title: "Food Delivery",
                     href: "/system-design/hld/real-world-systems/food-delivery-swiggy-zomato",
                   },
                   {
-                    title: "Design Google Docs",
+                    title: "Google Docs",
                     href: "/system-design/hld/real-world-systems/google-docs",
                   },
                   {
-                    title: "Design Google Maps",
+                    title: "Google Maps",
                     href: "/system-design/hld/real-world-systems/google-maps",
                   },
                   {
-                    title: "Design Zoom",
+                    title: "Zoom",
                     href: "/system-design/hld/real-world-systems/zoom",
                   },
                   {
-                    title: "File Sharing System",
+                    title: "File Sharing",
                     href: "/system-design/hld/real-world-systems/file-sharing-system",
                   },
                   {
-                    title: "Distributed Web Crawler",
+                    title: "Web Crawler",
                     href: "/system-design/hld/real-world-systems/distributed-web-crawler",
                   },
                   {
-                    title: "Distributed Cloud Storage",
+                    title: "Cloud Storage",
                     href: "/system-design/hld/real-world-systems/distributed-cloud-storage",
                   },
                   {
-                    title: "Distributed Locking Service",
+                    title: "Locking Service",
                     href: "/system-design/hld/real-world-systems/distributed-locking-service",
                   },
                   {
-                    title: "Stock Exchange / Trading Platform",
+                    title: "Stock Exchange",
                     href: "/system-design/hld/real-world-systems/stock-exchange",
                   },
                   {
