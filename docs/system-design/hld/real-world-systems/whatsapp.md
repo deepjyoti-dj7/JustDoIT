@@ -1,980 +1,622 @@
-# Designing WhatsApp: A Production-Scale Messaging System
+---
+title: Design WhatsApp
+---
 
-> **Difficulty:** Medium | **Category:** Real-Time Messaging | **Companies:** Meta, Telegram, Signal, WeChat
+# Design WhatsApp
+
+WhatsApp serves **2 billion+ users** exchanging **100 billion messages per day**. It is one of the most studied system design problems because it combines real-time messaging, guaranteed delivery, group fan-out, and offline handling — all under strict latency and reliability constraints.
+
+The surface looks simple: send a message, receive a message. The depth lies in how you deliver 100 billion messages reliably per day, route them to the right WebSocket connection across thousands of servers, and guarantee nothing is lost when a user's phone is offline for a week.
 
 ---
 
-## Introduction
+## Functional Requirements
 
-WhatsApp is the world's most widely used instant messaging platform — **2 billion+ active users**, **100 billion messages per day**, and availability in **180+ countries**. It handles text messages, images, videos, voice notes, group chats, end-to-end encryption, and real-time delivery receipts — all at planetary scale.
+**In Scope:**
+- Send and receive 1-on-1 text messages in real time
+- Group messaging (up to 1,024 members)
+- Message delivery receipts: sent ✓, delivered ✓✓, read ✓✓ (blue ticks)
+- Media sharing: images, video, audio, documents
+- Online presence and last-seen indicators
+- Push notifications for offline users
 
-What makes designing WhatsApp genuinely interesting isn't just the scale — it's the **combination of hard problems**:
-
-- Real-time bi-directional communication with strict latency requirements
-- Reliable message delivery with offline buffering
-- End-to-end encryption at scale
-- Presence/online status for billions of users
-- Group messaging with fan-out to thousands of members
-- Media delivery (images, video) without killing your storage budget
-
-If you can design WhatsApp well, you understand the core pillars of distributed systems: **consistency, availability, partition tolerance, latency, durability, and security**.
+**Out of Scope:**
+- End-to-end encryption key exchange internals (Signal Protocol)
+- Voice / video calling infrastructure
+- WhatsApp Web multi-device sync
+- Payments, Status (Stories), Channels, Business API
 
 ---
 
-## Requirements Clarification
+## Non-Functional Requirements
 
-### Functional Requirements
+| Property | Target | Reasoning |
+|---|---|---|
+| **Message Latency** | p99 < 100ms for online users | Real-time feel; anything beyond 200ms is perceptibly laggy |
+| **Availability** | 99.99% (< 53 min downtime/year) | Messaging is mission-critical; outages break trust immediately |
+| **Durability** | Zero message loss; media persisted indefinitely | Users expect nothing dropped — ever |
+| **Ordering** | Strict per-conversation ordering | Out-of-order messages break conversation coherence |
+| **Scale** | 2B users, 100B messages/day, 500M DAU | Every architecture decision flows from this scale |
+| **Notification Latency** | < 5s push for offline users | Balance between battery (fewer pushes) and UX (fast wake-up) |
 
-- **1:1 messaging** — send and receive text messages in real-time
-- **Group messaging** — up to 1024 members per group
-- **Message delivery receipts** — sent ✓, delivered ✓✓, read ✓✓ (blue)
-- **Online/last seen presence** — show if user is online or when they were last active
-- **Media sharing** — images, videos, audio, documents
-- **Push notifications** — notify offline users of new messages
-- **End-to-end encryption** — messages readable only by sender and receiver
-- **Message history sync** — across devices (WhatsApp Web, mobile)
-
-### Non-Functional Requirements
-
-- **Low latency** — message delivery < 100ms for online users
-- **High availability** — 99.99% uptime (< 53 minutes downtime/year)
-- **Durability** — messages must not be lost in transit
-- **Eventual consistency** — delivery receipts may lag slightly; message order must be preserved
-- **Scalability** — support 2B+ users, 100B+ messages/day
-- **Security** — E2E encryption, no message storage on servers post-delivery
-- **Offline support** — buffer messages for users who are temporarily offline
-
-### Out of Scope
-
-- Payments (WhatsApp Pay)
-- Business API
-- Status/Stories (separate subsystem)
+**Key tradeoff:** WhatsApp prioritizes **delivery guarantees over strict real-time throughput**. A message delayed 50ms is acceptable; a dropped message is not. This single principle drives the choice of Kafka as a durable buffer between ingestion and delivery.
 
 ---
 
 ## Capacity Estimation
 
-### Users & Traffic
+**Messages:**
+- 100B messages/day → ~1.15M/sec average; ~4–5M/sec peak (holidays, major events)
+- Average message: 1 KB text; media attachments ~500 KB average
 
-| Metric | Estimate |
-|---|---|
-| Monthly Active Users (MAU) | 2 billion |
-| Daily Active Users (DAU) | 1.5 billion |
-| Messages per day | 100 billion |
-| Messages per second (avg) | ~1.16 million/s |
-| Messages per second (peak) | ~5 million/s |
-| Active connections (peak) | ~500 million concurrent |
+**Storage:**
+- Text: 1.15M/sec × 1 KB = ~100 GB/day
+- Media: 20% messages carry media → 230K media/sec × 500 KB ≈ ~1–2 PB/day (after dedup + compression)
+- Message metadata + receipts: ~50 GB/day
+- **Total: ~2–3 PB/day** — requires tiered object storage with automatic cold archival
 
-### Storage Estimation
+**Connections:**
+- 500M DAU with persistent WebSocket connections
+- 100K connections/server → **5,000 WebSocket servers** at peak
+- Redis stores 500M session entries × ~100 bytes = **~50 GB** for session registry
 
-**Text messages:**
-- Average message size: ~100 bytes
-- 100B messages/day × 100 bytes = **10 TB/day** (text only)
-- WhatsApp deletes messages post-delivery; server-side retention minimal
-
-**Media messages:**
-- ~30% of messages contain media
-- Average media size: 500 KB (compressed)
-- 30B × 500 KB = **15 PB/day** of media (stored in object storage)
-- CDN caching aggressively reduces origin load
-
-**Message metadata** (delivery status, timestamps):
-- ~200 bytes per message
-- 100B × 200 bytes = **20 TB/day**
-
-### Bandwidth Estimation
-
-- Inbound: 5M messages/sec × 100 bytes = **500 MB/s**
-- Media upload: 30% × 500 KB × ~350K media/sec = **~175 GB/s** peak
-- CDN offloads ~80% of media reads
-
-### Connection Infrastructure
-
-- 500M persistent WebSocket connections
-- Distributed across thousands of chat servers
-- Each chat server handles ~50K-100K connections
+**Bandwidth:**
+- Inbound: ~1.15 GB/sec (text only)
+- Group message amplification (avg 50 members): ~5–10× → **10–15 GB/sec** outbound
 
 ---
 
-## High-Level Architecture
+## Core Entities
 
-WhatsApp's architecture is built around a **persistent connection model** — every client maintains a long-lived WebSocket (or custom XMPP) connection to a **chat server**. This is fundamentally different from a request-response HTTP model.
+| Entity | Purpose | Key Fields |
+|---|---|---|
+| **User** | Account identity and profile | `user_id`, `phone_number`, `display_name`, `profile_photo_url`, `last_seen`, `privacy_settings` |
+| **Message** | A single atomic message unit | `message_id`, `sender_id`, `chat_id`, `type`, `content`, `media_url`, `client_message_id`, `sent_at` |
+| **Chat** | 1-on-1 conversation context | `chat_id`, `participant_ids[2]`, `created_at` |
+| **Group** | Multi-user conversation | `group_id`, `name`, `admin_ids[]`, `description`, `member_count`, `created_at` |
+| **GroupMember** | Membership and role tracking | `group_id`, `user_id`, `role` (admin/member), `joined_at`, `left_at` |
+| **MessageStatus** | Per-recipient delivery state | `message_id`, `recipient_id`, `status` (sent/delivered/read), `updated_at` |
+| **Media** | Binary attachment metadata | `media_id`, `uploader_id`, `cdn_url`, `type`, `size_bytes`, `sha256_hash`, `created_at` |
 
-```mermaid
-graph TB
-    Client["📱 Client App"] -->|WebSocket / TLS| LB["Load Balancer"]
-    LB --> CS1["Chat Server 1"]
-    LB --> CS2["Chat Server 2"]
-    LB --> CS3["Chat Server N"]
+**Delivery Status Lifecycle:**
 
-    CS1 --> MQ["Message Queue\n(Kafka)"]
-    CS2 --> MQ
-    CS3 --> MQ
+| Status | Meaning | Set By | Storage |
+|---|---|---|---|
+| `sent` | Server persisted the message | Message Service on Cassandra write | Cassandra (permanent) |
+| `delivered` | Recipient device received it | WebSocket Service on push | Redis TTL 7 days |
+| `read` | Recipient opened the conversation | Client sends receipt event | Cassandra (permanent) |
+| `failed` | Undeliverable after retry window | Notification Service on TTL expiry | Cassandra (permanent) |
 
-    MQ --> DS["Delivery Service"]
-    MQ --> NS["Notification Service"]
-    MQ --> AS["Analytics Service"]
-
-    DS --> Cache["Session Cache\n(Redis)"]
-    DS --> MsgDB["Message Store\n(Cassandra)"]
-    DS --> CS1
-    DS --> CS2
-
-    NS --> FCM["FCM / APNs\n(Push Notifications)"]
-
-    Client -->|Media Upload| MediaSvc["Media Service"]
-    MediaSvc --> ObjStore["Object Storage\n(S3-compatible)"]
-    MediaSvc --> CDN["CDN\n(CloudFront / Akamai)"]
-```
-
-### Major Components
-
-| Component | Role |
-|---|---|
-| **Chat Server** | Maintains persistent WebSocket connections, routes messages |
-| **Message Queue (Kafka)** | Decouples ingestion from delivery, provides durability |
-| **Delivery Service** | Looks up recipient's connection, delivers or buffers |
-| **Session Cache (Redis)** | Maps user_id → chat_server for routing |
-| **Message Store (Cassandra)** | Stores undelivered messages for offline users |
-| **Media Service** | Handles upload/download of images, video, audio |
-| **Notification Service** | Pushes FCM/APNs for offline users |
-| **Presence Service** | Tracks online/offline/last-seen status |
+**Critical modeling decisions:**
+- `client_message_id` is generated by the client before sending — the server deduplicates on this key, preventing duplicate messages on network retry. This is idempotency at the application layer.
+- `MessageStatus` has one row **per recipient** — a 1,024-member group creates 1,023 status rows. This is exactly why receipt fan-out is a dedicated deep-dive problem.
+- `Media.sha256_hash` enables server-side deduplication — if two users send the same photo, only one S3 object is stored.
 
 ---
 
-## Core Components Deep Dive
+## Databases and Database Design
 
-### 1. Chat Server & Connection Management
+### Storage Tier Decisions
 
-The Chat Server is the heart of WhatsApp. Each server maintains **persistent TCP/WebSocket connections** using an event-driven, non-blocking I/O model (like Erlang's actor model — WhatsApp's original stack was literally **Erlang/BEAM**).
+| Data | Access Pattern | Engine | Why |
+|---|---|---|---|
+| Messages | Append-only, time-range reads per chat | **Cassandra** | LSM-tree optimized for sequential writes; time-series clustering key |
+| Users, Groups, Membership | Relational, strong consistency, low write volume | **PostgreSQL** | ACID for group membership changes; foreign key integrity |
+| Sessions, Presence, Delivery Status cache | Ephemeral, sub-millisecond reads, TTL-driven | **Redis** | O(1) key-value; TTL lifecycle; Cluster for scale |
+| Media binaries | Write-once, read-many, petabyte scale | **S3 + CDN** | Object storage for PB scale; CDN for edge delivery |
+| Message status (permanent) | High write fan-out, eventual reads | **Cassandra** | High write throughput; per-recipient rows distribute naturally |
 
-**Why persistent connections?**
-- HTTP polling is too slow (100ms+ per poll cycle)
-- WebSocket allows server-to-client push with microsecond latency
-- A single Erlang process per connection scales to millions of connections per machine
-
-When a client connects:
-1. Client authenticates via JWT token
-2. Chat server registers `user_id → server_id` in the Session Cache (Redis)
-3. Chat server checks for any buffered offline messages in Cassandra and flushes them
-
-```mermaid
-sequenceDiagram
-    participant C as 📱 Client
-    participant LB as Load Balancer
-    participant CS as Chat Server
-    participant Redis as Session Cache
-    participant Cassandra as Message Store
-
-    C->>LB: TLS Handshake + JWT
-    LB->>CS: Route to available server
-    CS->>Redis: SET user:123 → server:42
-    CS->>Cassandra: GET undelivered messages for user:123
-    Cassandra-->>CS: [msg1, msg2, msg3]
-    CS-->>C: Flush buffered messages
-    Note over C,CS: Persistent WebSocket open
-```
-
-### 2. Message Send Flow
-
-```mermaid
-sequenceDiagram
-    participant S as 📱 Sender
-    participant CS_S as Chat Server (Sender)
-    participant Kafka as Kafka
-    participant DS as Delivery Service
-    participant Redis as Session Cache
-    participant CS_R as Chat Server (Receiver)
-    participant R as 📱 Receiver
-
-    S->>CS_S: SEND{to: user_B, msg: "Hey!"}
-    CS_S->>Kafka: Publish message event
-    CS_S-->>S: ACK (message sent ✓)
-
-    Kafka->>DS: Consume message event
-    DS->>Redis: GET user_B → server_id?
-
-    alt User B is online
-        Redis-->>DS: server:67
-        DS->>CS_R: DELIVER message to user_B
-        CS_R->>R: Push message
-        R-->>CS_R: ACK delivered ✓✓
-        CS_R->>DS: Delivery receipt
-        DS->>Kafka: Publish delivery_receipt event
-        Kafka->>CS_S: Delivery receipt
-        CS_S->>S: Update to delivered ✓✓
-    else User B is offline
-        Redis-->>DS: null
-        DS->>Cassandra: STORE message for user_B
-        DS->>NotifSvc: Send push notification
-    end
-```
-
-**Key design decision:** The sender gets an ACK as soon as the message hits Kafka. This is an **at-least-once** delivery guarantee. The actual delivery to the recipient is async, which keeps the sender's perceived latency low.
-
-### 3. Session Cache (Redis)
-
-Redis stores the mapping of which chat server each online user is connected to:
-
-```
-Key:   session:{user_id}
-Value: {server_id, connected_at, last_heartbeat}
-TTL:   30 seconds (refreshed by heartbeats)
-```
-
-This is the **routing table** for the entire system. It must be:
-- **Fast** (sub-millisecond reads) — Redis delivers ~1M ops/sec
-- **Consistent** — stale entries cause missed deliveries
-- **Fault-tolerant** — Redis Cluster with replication
-
-When a user disconnects or a chat server crashes, the TTL naturally expires the session, and the user is treated as offline.
-
-### 4. Message Store (Cassandra)
-
-WhatsApp does **not** permanently store your messages on their servers (by design, due to E2E encryption). However, it **temporarily buffers** messages for offline users until delivery is confirmed.
-
-**Why Cassandra?**
-- Write-heavy workload — 1M+ messages/sec
-- Wide column model maps perfectly to `(user_id, timestamp)` access patterns
-- Linear horizontal scalability
-- High write availability (tunable consistency)
-- Multi-datacenter replication built-in
-
-**Schema:**
+### Schema 1 — Messages (Cassandra)
 
 ```sql
-CREATE TABLE pending_messages (
-    recipient_id    UUID,
-    message_id      TIMEUUID,       -- time-based UUID for ordering
-    sender_id       UUID,
-    chat_id         UUID,
-    ciphertext      BLOB,           -- E2E encrypted payload
-    media_url       TEXT,
-    message_type    TEXT,           -- text | image | video | audio
-    sent_at         TIMESTAMP,
-    expires_at      TIMESTAMP,      -- TTL: 30 days
-    PRIMARY KEY (recipient_id, message_id)
-) WITH CLUSTERING ORDER BY (message_id ASC)
-  AND default_time_to_live = 2592000;  -- 30 days TTL
+CREATE TABLE messages (
+  chat_id      UUID,
+  sent_at      TIMESTAMP,
+  message_seq  BIGINT,       -- server-assigned monotonic sequence (Redis INCR)
+  message_id   UUID,
+  sender_id    UUID,
+  type         TEXT,         -- 'text' | 'image' | 'video' | 'audio' | 'document'
+  content      TEXT,
+  media_url    TEXT,
+  PRIMARY KEY (chat_id, sent_at, message_seq)
+) WITH CLUSTERING ORDER BY (sent_at DESC, message_seq DESC)
+  AND compaction = {
+    'class': 'TimeWindowCompactionStrategy',
+    'compaction_window_unit': 'DAYS',
+    'compaction_window_size': 1
+  };
 ```
 
-Partitioned by `recipient_id` — all messages for a user are co-located on the same node for efficient range scans on reconnect.
+- Partition key `chat_id` co-locates all messages for a conversation on the same Cassandra node — no scatter-gather for history fetches.
+- TWCS compaction: daily windows are compacted independently, keeping read amplification low for recent data.
 
-### 5. Media Service & CDN
+### Schema 2 — Pending Delivery Inbox (Cassandra)
 
-Media is **never** sent inline through the chat server. The flow:
-
-1. Client uploads media to **Media Service** via HTTPS (multipart upload)
-2. Media Service stores encrypted blob in **Object Storage** (S3-compatible)
-3. Media Service returns a **CDN URL** + decryption key (separately encrypted)
-4. Sender sends the CDN URL (not the media itself) via chat
-5. Recipient downloads from CDN, decrypts locally
-
-```mermaid
-graph LR
-    S["📱 Sender"] -->|Upload encrypted media| MS["Media Service"]
-    MS -->|Store blob| S3["Object Storage (S3)"]
-    MS -->|Invalidate/Pre-warm| CDN["CDN Edge Node"]
-    MS -->|Return CDN URL| S
-    S -->|Send URL in message| CS["Chat Server"]
-    R["📱 Receiver"] -->|Download from CDN URL| CDN
-    R -->|Decrypt locally with key| R
+```sql
+CREATE TABLE pending_delivery (
+  recipient_id UUID,
+  sent_at      TIMESTAMP,
+  message_id   UUID,
+  chat_id      UUID,
+  sender_id    UUID,
+  content      TEXT,
+  type         TEXT,
+  PRIMARY KEY (recipient_id, sent_at, message_id)
+) WITH CLUSTERING ORDER BY (sent_at ASC);
 ```
 
-**CDN strategy:**
-- Popular media (viral content in groups) served from edge PoPs
-- Media TTL: 30 days (matches message retention)
-- Geo-routing to nearest edge server
+This is the offline inbox. On reconnect, the client sends its last-seen cursor; the server scans `WHERE recipient_id = ? AND sent_at > cursor` — a single-partition scan.
 
-### 6. Presence Service
-
-Knowing who's online is surprisingly expensive at WhatsApp's scale.
-
-**Challenge:** 500M online users. If each user subscribes to 200 contacts, that's **100 billion presence subscriptions** to maintain.
-
-**WhatsApp's approach:**
-- Presence is **pull-based by default** — clients poll when opening a chat
-- For active conversations, server pushes presence updates
-- Use a **fan-in fan-out** model with Redis Pub/Sub for active contacts
-- Presence data TTL: 5 minutes (stale but acceptable)
-
-```
-Key:   presence:{user_id}
-Value: {status: "online"|"offline", last_seen: timestamp}
-TTL:   5 minutes
-```
-
-### 7. Group Messaging & Fan-out
-
-Group messaging with 1024 members is a **fan-out problem**.
-
-**Naive approach:** Deliver to all 1024 members sequentially → too slow
-
-**WhatsApp's approach:**
-- Use **async fan-out via Kafka**
-- One message published → Delivery Service fans out to all group members
-- For large groups, use **batch delivery** (group members sharing the same chat server batched together)
-- Media is stored once, URL shared to all — no N copies of the same file
-
-```mermaid
-graph TD
-    S["📱 Sender in Group"] --> CS["Chat Server"]
-    CS --> Kafka["Kafka: group_message_topic"]
-    Kafka --> FO["Fan-out Worker"]
-    FO --> M1["Deliver to Member 1"]
-    FO --> M2["Deliver to Member 2"]
-    FO --> M3["Deliver to Member 3"]
-    FO --> MN["Deliver to Member N (1024)"]
-    FO --> OfflineQ["Buffer for offline members\n(Cassandra)"]
-```
-
----
-
-## Database Design
-
-### Storage Layer Decisions
-
-| Data Type | Store | Why |
-|---|---|---|
-| Pending messages | Cassandra | High write throughput, TTL support, partition by user |
-| User profiles | MySQL / PostgreSQL | Strong consistency, relational joins |
-| Session/presence | Redis | Sub-ms latency, TTL, pub/sub |
-| Group metadata | MySQL + Redis cache | Consistency for membership, cache for reads |
-| Media blobs | S3-compatible Object Store | Cost-efficient, unlimited scale |
-| Message search | Elasticsearch (optional) | Full-text search on message history |
-
-### User Profile Schema (MySQL)
+### Schema 3 — Users (PostgreSQL)
 
 ```sql
 CREATE TABLE users (
-    user_id         CHAR(36) PRIMARY KEY,
-    phone_number    VARCHAR(15) UNIQUE NOT NULL,
-    display_name    VARCHAR(100),
-    profile_pic_url TEXT,
-    about           VARCHAR(139),
-    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-    last_seen       DATETIME,
-    is_active       BOOLEAN DEFAULT TRUE,
-    INDEX idx_phone (phone_number)
+  user_id      UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  phone_number VARCHAR(20)  UNIQUE NOT NULL,
+  display_name VARCHAR(100),
+  last_seen    TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ  DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX idx_users_phone ON users (phone_number);
 ```
 
-### Group Schema (MySQL)
+### Schema 4 — Groups and Membership (PostgreSQL)
 
 ```sql
 CREATE TABLE groups (
-    group_id        CHAR(36) PRIMARY KEY,
-    name            VARCHAR(100) NOT NULL,
-    description     TEXT,
-    icon_url        TEXT,
-    created_by      CHAR(36),
-    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-    max_members     INT DEFAULT 1024
+  group_id    UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        VARCHAR(100) NOT NULL,
+  description TEXT,
+  created_by  UUID         REFERENCES users(user_id),
+  created_at  TIMESTAMPTZ  DEFAULT NOW()
 );
 
 CREATE TABLE group_members (
-    group_id        CHAR(36),
-    user_id         CHAR(36),
-    role            ENUM('admin', 'member') DEFAULT 'member',
-    joined_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (group_id, user_id),
-    INDEX idx_user_groups (user_id)
+  group_id  UUID         REFERENCES groups(group_id),
+  user_id   UUID         REFERENCES users(user_id),
+  role      VARCHAR(10)  DEFAULT 'member',
+  joined_at TIMESTAMPTZ  DEFAULT NOW(),
+  left_at   TIMESTAMPTZ,
+  PRIMARY KEY (group_id, user_id)
 );
+
+CREATE INDEX idx_group_members_user ON group_members (user_id) WHERE left_at IS NULL;
 ```
 
-### Sharding Strategy
+The partial index (`WHERE left_at IS NULL`) is critical — listing all active groups for a user only scans current memberships.
 
-- **User data:** Shard by `user_id` (consistent hashing, 256 virtual nodes per shard)
-- **Messages:** Shard by `recipient_id` in Cassandra (natural partition key)
-- **Groups:** Shard by `group_id`, replicate membership list to Redis for fan-out
+### Schema 5 — Media Metadata (PostgreSQL)
 
-### Replication
+```sql
+CREATE TABLE media (
+  media_id     UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  uploader_id  UUID         REFERENCES users(user_id),
+  cdn_url      TEXT         NOT NULL,
+  type         TEXT         NOT NULL,
+  size_bytes   BIGINT       NOT NULL,
+  sha256_hash  CHAR(64)     UNIQUE,    -- deduplication key
+  created_at   TIMESTAMPTZ  DEFAULT NOW()
+);
 
-- Cassandra: Replication factor 3, across 3 availability zones, `LOCAL_QUORUM` writes
-- MySQL: Primary + 2 read replicas per shard; async replication for reads
-- Redis: Redis Cluster with 3 master + 3 replica nodes
+CREATE UNIQUE INDEX idx_media_hash ON media (sha256_hash);
+```
+
+### Sharding and Replication Strategy
+
+| Store | Shard Key | Strategy | Replication |
+|---|---|---|---|
+| Messages (Cassandra) | `chat_id` | Consistent hashing (Murmur3) | RF=3, `LOCAL_QUORUM` writes |
+| Pending Delivery (Cassandra) | `recipient_id` | Consistent hashing | RF=3, `LOCAL_ONE` reads |
+| Message Status (Cassandra) | `message_id` | Consistent hashing | RF=3 |
+| Users (PostgreSQL) | Single primary | Vertical + read replicas | Primary + 2 read replicas |
+| Redis (sessions, presence) | `user_id` hash slot | Redis Cluster (16,384 hash slots) | 1 replica per master |
 
 ---
 
 ## API Design
 
-### Send Message
-
-```
+**Send a message:**
+```http
 POST /v1/messages
 Authorization: Bearer <jwt>
-Content-Type: application/json
+Idempotency-Key: client-uuid-abc123
 
 {
-  "chat_id": "chat_abc123",
-  "recipient_id": "user_xyz789",   // null for group chats
-  "message_type": "text",
-  "ciphertext": "<E2E encrypted payload>",
-  "client_message_id": "msg_local_001",  // idempotency key
-  "media_url": null,
-  "reply_to_message_id": null
+  "chat_id":           "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "type":              "text",
+  "content":           "Hey, are you free tonight?",
+  "client_message_id": "client-uuid-abc123"
 }
 
-Response 202 Accepted:
+201 Created
 {
-  "server_message_id": "msg_srv_abc456",
-  "status": "sent",
-  "timestamp": "2026-05-26T11:30:00Z"
+  "message_id": "server-uuid-xyz",
+  "status":     "sent",
+  "sent_at":    "2026-05-29T10:00:00Z"
 }
 ```
 
-### Upload Media
+**Fetch message history (cursor-paginated):**
+```http
+GET /v1/chats/{chat_id}/messages?before=2026-05-29T10:00:00Z&limit=30
 
-```
-POST /v1/media/upload
-Authorization: Bearer <jwt>
-Content-Type: multipart/form-data
-
-Fields:
-  - file: <encrypted binary>
-  - mime_type: "image/jpeg"
-  - file_size: 204800
-  - checksum: "sha256:<hash>"
-
-Response 200 OK:
-{
-  "media_id": "media_def789",
-  "cdn_url": "https://cdn.whatsapp.net/media/def789",
-  "expires_at": "2026-06-25T11:30:00Z"
-}
-```
-
-### Get Message History (for offline sync)
-
-```
-GET /v1/chats/{chat_id}/messages?since=<timestamp>&limit=50
-Authorization: Bearer <jwt>
-
-Response 200 OK:
+200 OK
 {
   "messages": [
-    {
-      "message_id": "msg_srv_abc456",
-      "sender_id": "user_abc123",
-      "ciphertext": "<E2E encrypted>",
-      "message_type": "text",
-      "sent_at": "2026-05-26T10:00:00Z",
-      "delivery_status": "delivered"
-    }
+    { "message_id": "uuid", "sender_id": "uuid", "content": "Hey!",
+      "type": "text", "sent_at": "2026-05-29T09:58:00Z", "status": "read" }
   ],
-  "next_cursor": "<opaque pagination token>"
+  "next_cursor": "2026-05-29T09:58:00Z",
+  "has_more": true
 }
 ```
 
-### WebSocket Message Format
+> Cursor-based pagination on `sent_at`. Offset pagination (`?page=N`) is O(n) on Cassandra — never use it.
 
-```json
-// Incoming message event (server → client)
-{
-  "type": "message",
-  "payload": {
-    "message_id": "msg_srv_abc456",
-    "chat_id": "chat_abc123",
-    "sender_id": "user_abc123",
-    "ciphertext": "<E2E encrypted>",
-    "timestamp": "2026-05-26T11:30:00Z"
-  }
-}
+**Request media upload URL:**
+```http
+POST /v1/media/upload-url
+{ "content_type": "image/jpeg", "size_bytes": 204800 }
 
-// Delivery receipt event (server → sender)
+200 OK
 {
-  "type": "receipt",
-  "payload": {
-    "message_id": "msg_srv_abc456",
-    "status": "delivered",  // sent | delivered | read
-    "timestamp": "2026-05-26T11:30:01Z"
-  }
+  "upload_url": "https://s3.amazonaws.com/...?X-Amz-Signature=...",
+  "media_id":   "media-uuid",
+  "expires_in": 300
 }
 ```
+
+**Update delivery receipt:**
+```http
+PATCH /v1/messages/{message_id}/status
+{ "status": "read", "recipient_id": "user-uuid" }
+
+204 No Content
+```
+
+**Get user presence:**
+```http
+GET /v1/presence/{user_id}
+
+200 OK
+{ "user_id": "uuid", "online": true, "last_seen": "2026-05-29T09:55:00Z" }
+```
+
+**Create or update a group:**
+```http
+POST /v1/groups
+{
+  "name":       "Europe Trip 2026",
+  "member_ids": ["uid1", "uid2", "uid3"]
+}
+
+201 Created
+{ "group_id": "grp-uuid", "name": "Europe Trip 2026", "member_count": 3 }
+```
+
+**Real-time channel (WebSocket):**
+```
+WSS wss://msg.whatsapp.net/v1/connect
+Authorization: Bearer <jwt>
+```
+All real-time events — message delivery, receipts, presence changes — flow over this single persistent connection. REST handles history loading and configuration. The WebSocket is multiplexed: one connection carries all chat traffic for the client.
 
 ---
 
-## Scalability Challenges
-
-### 1. Hot Partitions in Cassandra
-
-A celebrity or viral group can create a **hot partition** — all reads/writes funneling to one Cassandra node.
-
-**Solution:**
-- Add a **bucket suffix** to partition keys: `recipient_id + bucket(0-9)`
-- Spread writes across 10 partitions; scatter-gather on reads
-- Monitor partition sizes with Cassandra's `nodetool tablestats`
-
-### 2. Fan-out Problem in Group Messaging
-
-Sending a message in a 1024-member group triggers 1024 individual deliveries. At 1M group messages/sec, that's **1 billion fan-out operations/sec**.
-
-**Solutions:**
-- **Write fan-out at read time** for very large groups: store message once, fan out lazily when members come online
-- **Batch deliveries** per chat server — instead of 1024 individual events, aggregate per destination server
-- **Tiered fan-out:** Small groups (< 100): eager fan-out. Large groups: lazy fan-out
-
-### 3. Presence System at Scale
-
-Naively broadcasting presence to all contacts doesn't scale for 2B users.
-
-**Solutions:**
-- Use **interest-based subscription** — only push updates when a chat is open
-- Cluster presence servers by geographic region
-- Use **Bloom filters** to quickly check if a user has any online contacts
-- Publish to Kafka's presence topic; consumers filter by relevant subscriptions
-
-### 4. Message Ordering
-
-In distributed systems, maintaining strict message order across shards is hard.
-
-**WhatsApp's approach:**
-- Use **TIMEUUID** (Cassandra's time-based UUID) as message IDs — naturally sortable
-- Client-side sequencing: each client maintains a local sequence counter
-- Server-side ordering within a chat: enforced by Kafka partition (all messages in a chat go to the same Kafka partition)
-
-### 5. Cache Invalidation for Sessions
-
-When a chat server crashes, its users' sessions in Redis become stale.
-
-**Solution:**
-- Chat servers send **heartbeats** every 10 seconds to Redis
-- Session TTL is 30 seconds — missed heartbeats auto-expire sessions
-- Upon session expiry, users are treated as offline; messages buffered in Cassandra
-
-### 6. E2E Encryption Key Distribution
-
-The Signal Protocol (used by WhatsApp) requires key exchange before the first message.
-
-**Challenge:** Bootstrapping keys at scale (2B users, each with multiple devices)
-
-**Solution:**
-- Each client pre-generates and uploads **one-time pre-keys** (OTPKs) to the key server
-- Key server stores public keys only — never sees private keys
-- If OTPKs run out, fall back to the signed pre-key (slight security reduction)
-
----
-
-## Scaling Strategies
-
-### Horizontal Scaling of Chat Servers
-
-Chat servers are **stateful** (they hold WebSocket connections) but **functionally stateless** — routing information lives in Redis. This means:
-- New chat servers can join the cluster at any time
-- Redis session cache is the single source of routing truth
-- Client reconnects are transparent via load balancer health checks
-
-### Kafka Partitioning
-
-```
-Topic: messages
-  Partition 0: chats A-F (by chat_id hash)
-  Partition 1: chats G-M
-  ...
-  Partition N: chats X-Z
-```
-
-- Messages in the same chat always go to the same partition → guaranteed ordering within a chat
-- Scale throughput by adding partitions (and consumer instances)
-
-### Read Replicas for User Profiles
-
-User profile lookups (display name, avatar) are read-heavy. Use:
-- MySQL read replicas with async replication
-- Redis cache layer (TTL: 1 hour for profile data)
-- CDN for profile images
-
-### Async Processing via Kafka
-
-All non-critical paths are async:
-- Delivery receipts
-- Read receipts
-- Presence updates
-- Analytics events
-- Notification sends
-
-This keeps the critical path (message delivery) lean and fast.
-
-### Multi-Region Deployment
+## High-Level Design
 
 ```mermaid
-graph TB
-    subgraph "US-East"
-        CS_US["Chat Servers"]
-        Redis_US["Redis Cluster"]
-        Cassandra_US["Cassandra Ring"]
-        Kafka_US["Kafka Cluster"]
-    end
-    subgraph "EU-West"
-        CS_EU["Chat Servers"]
-        Redis_EU["Redis Cluster"]
-        Cassandra_EU["Cassandra Ring"]
-        Kafka_EU["Kafka Cluster"]
-    end
-    subgraph "APAC"
-        CS_AP["Chat Servers"]
-        Redis_AP["Redis Cluster"]
-        Cassandra_AP["Cassandra Ring"]
-        Kafka_AP["Kafka Cluster"]
-    end
-
-    DNS["Global DNS / Anycast"] --> CS_US
-    DNS --> CS_EU
-    DNS --> CS_AP
-
-    Cassandra_US <-->|Cross-DC Replication| Cassandra_EU
-    Cassandra_EU <-->|Cross-DC Replication| Cassandra_AP
+flowchart TD
+    Client[Mobile Client] --> LB[Load Balancer]
+    LB --> AG[API Gateway]
+    LB --> WS[WebSocket Service]
+    AG --> MS[Message Service]
+    AG --> GS[Group Service]
+    AG --> PS[Presence Service]
+    MS --> Cass[(Cassandra Messages)]
+    MS --> Kafka[Kafka Message Bus]
+    Kafka --> FO[Fan-out Service]
+    Kafka --> NS[Notification Service]
+    FO --> WS
+    FO --> Cass
+    WS --> Redis[(Redis Sessions + Presence)]
+    PS --> Redis
+    NS --> Push[FCM / APNS]
+    Client -->|Pre-signed upload| S3[Object Storage S3]
+    S3 --> CDN[CDN Edge]
+    AG --> PG[(PostgreSQL Users + Groups)]
 ```
 
-- Users connect to nearest region via Anycast DNS
-- Cassandra cross-DC replication ensures global durability
-- Message delivery within same region: ~5ms. Cross-region: ~80-150ms
+**Component responsibilities:**
 
----
-
-## Reliability & Fault Tolerance
-
-### Retry Logic
-
-```
-Message publish to Kafka:
-  - Retry with exponential backoff: 100ms, 200ms, 400ms...
-  - Max retries: 5
-  - Dead Letter Queue (DLQ) for failed messages after exhaustion
-  
-Delivery to client:
-  - Retry 3 times if WebSocket ACK not received
-  - After 3 failures, treat as offline, store in Cassandra
-```
-
-### Circuit Breaker
-
-Wrap all inter-service calls with a circuit breaker (Hystrix / Resilience4j):
-
-```
-States: CLOSED → OPEN → HALF_OPEN → CLOSED
-
-CLOSED: Normal operation
-OPEN: Failure threshold exceeded (50% error rate in 10s) → fast-fail
-HALF_OPEN: Allow 1 test request; if success → CLOSED, else → OPEN
-```
-
-This prevents **cascade failures** when, e.g., Cassandra is slow under load.
-
-### Redundancy
-
-| Component | Redundancy Strategy |
+| Component | Role |
 |---|---|
-| Chat Servers | N+2 instances behind load balancer |
-| Redis | Master + 2 replicas per shard (Redis Sentinel for failover) |
-| Cassandra | RF=3, minimum 2 AZs |
-| Kafka | 3 broker replicas, `min.insync.replicas=2` |
-| Object Storage | 11 nines durability (S3 standard) |
-| Load Balancers | Active-Active pair with health checks |
+| **API Gateway** | JWT validation, rate limiting, TLS termination, routing |
+| **Message Service** | Persists message to Cassandra; publishes `message-created` to Kafka; returns 201 immediately |
+| **WebSocket Service** | Holds persistent client connections; routes and delivers in-flight messages |
+| **Fan-out Service** | Kafka consumer; expands group messages into per-member delivery events |
+| **Presence Service** | Tracks online/offline via Redis TTL heartbeats |
+| **Notification Service** | Kafka consumer; triggers FCM/APNS for offline recipients |
+| **Kafka** | Durable ordered event log; decouples ingestion from all downstream consumers |
+| **Redis** | WebSocket session registry, delivery status cache, presence data, group membership cache |
 
-### Disaster Recovery
-
-- **RPO (Recovery Point Objective):** < 1 minute (Kafka log replay)
-- **RTO (Recovery Time Objective):** < 5 minutes (automated failover)
-- Daily snapshots of Cassandra to S3 (incremental)
-- Cross-region Cassandra replication as active standby
-
-### Idempotent Message Delivery
-
-Clients include a `client_message_id` (UUID generated locally). Server uses this as an idempotency key:
-
-```
-On receive:
-  IF EXISTS message with client_message_id → return existing server_message_id
-  ELSE → process and store
-```
-
-This handles network retries without creating duplicate messages.
+**Message send flow:**
+1. Client → `POST /v1/messages` → API Gateway → Message Service
+2. Message Service writes to Cassandra (durable), publishes to Kafka → returns `201 sent` immediately
+3. Kafka → Fan-out Service (if group) → per-member delivery events onto `delivery.events` topic
+4. WebSocket Service looks up recipient session in Redis → routes delivery to correct server → pushes to recipient
+5. Recipient ACKs → `message_status` updated → sender notified via WebSocket
 
 ---
 
-## Security Considerations
+## Deep Dives
 
-### End-to-End Encryption (Signal Protocol)
+### 1. Kafka: Required and Central
 
-WhatsApp uses the **Signal Protocol** — arguably the gold standard for E2E encryption:
+At 1.15M messages/sec average, synchronous delivery inside the Message Service would:
+- **Couple write latency to delivery latency** — if recipient's WebSocket is slow, the sender's `POST /messages` blocks
+- **Lose in-flight messages on crash** — no durable buffer between write and delivery
+- **Prevent independent scaling** — delivery throughput caps at message ingestion throughput
 
-- **Double Ratchet Algorithm** — forward secrecy + break-in recovery
-- **X3DH (Extended Triple Diffie-Hellman)** — key agreement
-- **AES-256-CBC** for symmetric message encryption
-- **HMAC-SHA256** for message authentication
-
-**What WhatsApp servers see:**
-- ✅ Metadata (who messaged whom, when, how often)
-- ❌ Message content (fully encrypted)
-- ❌ Media content (encrypted before upload)
-
-### Authentication Flow
+Kafka solves all three. Message Service writes to Kafka and returns immediately. Each downstream consumer scales independently.
 
 ```mermaid
 sequenceDiagram
-    participant C as 📱 Client
-    participant AS as Auth Service
-    participant SMS as SMS Gateway
+    participant C as Client
+    participant MS as Message Service
+    participant K as Kafka
+    participant WS as WebSocket Service
+    participant NS as Notification Service
 
-    C->>AS: POST /auth/register {phone: "+91-9876543210"}
-    AS->>SMS: Send OTP
-    C->>AS: POST /auth/verify {phone, otp: "123456"}
-    AS-->>C: JWT access_token (24h) + refresh_token (30d)
-    C->>AS: WebSocket upgrade with Bearer token
+    C->>MS: POST /messages
+    MS->>Cassandra: Persist (durable)
+    MS->>K: Publish to messages topic
+    MS-->>C: 201 OK status=sent
+    K-->>WS: Consume event
+    WS->>Recipient: Deliver via WebSocket
+    WS-->>MS: ACK delivered
+    alt Recipient offline
+        K-->>NS: Separate consumer group
+        NS->>FCM: Push notification
+    end
 ```
 
-### Authorization
+**Kafka Topic Design:**
 
-- **JWT tokens** with short expiry (24 hours) + refresh tokens
-- Tokens signed with RS256 (asymmetric) — public keys published for verification
-- Rate limiting on auth endpoints: 5 OTP requests/hour per phone number
-
-### Transport Security
-
-- All connections over **TLS 1.3**
-- Certificate pinning in the mobile app (prevents MITM even with compromised CAs)
-- Perfect Forward Secrecy (PFS) via ECDHE key exchange
-
-### Abuse Prevention
-
-- **Rate limiting** at API Gateway: 100 messages/minute per user for broadcast
-- **Spam detection** via ML model on metadata (frequency, recipient patterns) — never on content
-- **Phone number verification** prevents anonymous abuse
-- Group invitation links have revocable tokens
-
-### DDoS Protection
-
-- Anycast routing absorbs volumetric attacks at network edge
-- CDN layer absorbs application-level floods
-- Connection rate limiting per IP at load balancer: 10 new connections/sec
-- Automatic IP blocking via WAF rules
-
----
-
-## Tradeoffs & Alternatives
-
-### Why WebSockets over HTTP/2 Server-Sent Events?
-
-| | WebSocket | HTTP/2 SSE | Long Polling |
+| Topic | Partition Key | Consumers | Retention |
 |---|---|---|---|
-| **Bidirectional** | ✅ | ❌ (server → client only) | ✅ (2 connections) |
-| **Latency** | ~1ms | ~5ms | ~100ms+ |
-| **Connection overhead** | Low | Medium | High |
-| **Proxy support** | Some issues | Good | Good |
-| **Complexity** | Medium | Low | Low |
+| `messages` | `chat_id` | Fan-out Service | 7 days |
+| `delivery.events` | `recipient_user_id` | WebSocket Service, Notification Service | 3 days |
+| `receipts` | `chat_id` | Message Service | 3 days |
+| `presence.events` | `user_id` | Presence Service | 1 day |
 
-**Verdict:** WebSocket wins for real-time bidirectional messaging.
+Partitioning `messages` by `chat_id` guarantees in-order delivery within each conversation — no distributed locking needed for ordering. Partitioning `delivery.events` by `recipient_user_id` ensures one consumer handles all deliveries for a given user.
 
-### Why Cassandra over MongoDB for Message Storage?
+**Backpressure:** If the WebSocket Service lags (server restart, deploy), Kafka buffers the lag. Consumers catch up without data loss. Alert if consumer group lag exceeds 10 seconds — that means recipients see delayed messages.
 
-| | Cassandra | MongoDB |
-|---|---|---|
-| **Write throughput** | Extremely high (LSM-tree) | High (WiredTiger) |
-| **Horizontal scale** | Linear, peer-to-peer | Shard-based, complex |
-| **TTL support** | Native, per-row | TTL index (collection-level) |
-| **Query flexibility** | Limited (by design) | Rich queries |
-| **Consistency** | Tunable | Tunable |
-
-WhatsApp's access pattern is simple: `READ WHERE recipient_id = X AND timestamp > Y`. Cassandra's wide-column model is perfectly suited. No need for MongoDB's query flexibility.
-
-### Why Kafka over RabbitMQ?
-
-| | Kafka | RabbitMQ |
-|---|---|---|
-| **Throughput** | Millions/sec | ~50K/sec |
-| **Retention** | Days/weeks (log-based) | Until consumed |
-| **Replay** | ✅ (consumer offsets) | ❌ |
-| **Ordering** | Per partition | Per queue |
-| **Use case** | Event streaming | Task queues |
-
-At 1M+ messages/sec, Kafka is the only sensible choice.
-
-### Why Not Store Messages Permanently?
-
-WhatsApp deliberately chose **not** to store messages server-side:
-- **Privacy:** Can't be subpoenaed for content you don't have
-- **Cost:** 100B messages/day × 100 bytes = 10 TB/day. 30-day retention = 300 TB. 1-year = 3.6 PB. At $23/TB/month (S3), that's ~$83M/year just for text.
-- **Competitive differentiator** — users trust WhatsApp more because of this
+**Tradeoff:** Kafka adds 5–20ms of latency. At < 100ms total delivery SLA, this is ~20% of budget — acceptable. For sub-10ms gaming or trading systems, Kafka would be too slow.
 
 ---
 
-## Real-World Engineering Insights
+### 2. Redis: Caching, Strategies, and Invalidation
 
-### Meta's Infrastructure for WhatsApp
+Redis underpins four critical subsystems. Each has a different caching strategy:
 
-After the 2014 acquisition, Meta integrated WhatsApp into their infrastructure while keeping the Erlang core:
+**a) WebSocket Session Registry**
 
-- **Erlang/BEAM VM** — still powers the chat server layer. Erlang's actor model gives them millions of lightweight processes, each handling one connection. This is why 50 engineers ran WhatsApp at 1B users.
-- **Scribe (Meta's log aggregation)** — replaces standalone Kafka for internal Meta deployments
-- **TAO (Meta's distributed cache)** — used for social graph lookups (contact lists)
+Every WebSocket server registers active connections:
+```
+SET ws:session:{user_id}  {server_id}  EX 90
+```
+The Fan-out Service looks up this key to route delivery to the correct server. On connect, the key is set. Every 30s heartbeat refreshes the TTL. On ungraceful disconnect, TTL expiry auto-removes it.
 
-### Signal Protocol at Scale
+**Invalidation:** TTL-based — no explicit invalidation needed. If a user reconnects to a different server, the `SET` overwrites the previous entry (last-write-wins).
 
-WhatsApp implemented the Signal Protocol — originally designed for individual messaging apps — at 2B user scale. The key innovation: **pre-key bundles** stored centrally allow asynchronous key agreement, so Alice can send Bob an encrypted message even if Bob is offline at the time of first contact.
+**b) Presence System**
 
-### Telegram's Different Bet
+```
+SET presence:{user_id}  online  EX 60
+```
+On graceful disconnect, `DEL presence:{user_id}` + async update to `users.last_seen` in PostgreSQL. 500M keys × 100 bytes = ~50 GB across a Redis Cluster.
 
-Telegram made the opposite choice from WhatsApp:
-- Stores messages on their servers (not E2E encrypted by default)
-- "Secret Chats" are E2E, "Cloud Chats" are not
-- This allows cross-device sync with no client-side key management
-- Tradeoff: lower security guarantees in exchange for convenience
+**Invalidation:** TTL-based. A 60-second TTL means a user who loses connectivity appears online for up to 60s — the "stale online" window. Reducing to 30s halves the window but doubles heartbeat write volume (16.7M writes/sec at 500M users).
 
-This illustrates that **architecture is about tradeoffs**, not absolute right answers.
+**c) Group Membership Cache**
 
-### iMessage's Lessons on Presence
+Fan-out reads group members on every group message send. Querying PostgreSQL for every fan-out is a read bottleneck.
 
-Apple's iMessage presence system is notoriously battery-draining because it subscribes to too many contacts. WhatsApp learned from this and uses **pull-based presence** as the default, only pushing to active conversations. A small change with massive impact on battery life for 2B devices.
+```
+SET grp:members:{group_id}  [uid1, uid2, ... uid1024]  EX 300
+```
 
----
+**Cache invalidation:** When a member joins or leaves, the Group Service:
+1. Updates PostgreSQL (source of truth)
+2. Issues `DEL grp:members:{group_id}` — explicit delete, not update
 
-## Final Architecture Diagram
+The next fan-out will miss the cache and re-populate from PostgreSQL with fresh data. This is the **cache-aside (lazy loading)** pattern with invalidation on write.
+
+**d) Delivery Status Cache**
+
+`delivered` status is written to Redis with TTL=7 days for fast reads. On status upgrade to `read`, write to Cassandra and `DEL` the Redis key:
 
 ```mermaid
-graph TB
-    subgraph "Client Layer"
-        iOS["📱 iOS App"]
-        Android["📱 Android App"]
-        Web["💻 WhatsApp Web"]
-    end
-
-    subgraph "Edge Layer"
-        DNS["Anycast DNS / GeoDNS"]
-        CDN["CDN (Media)"]
-        WAF["WAF + DDoS Protection"]
-    end
-
-    subgraph "Gateway Layer"
-        LB["L4 Load Balancer (ECMP)"]
-        AG["API Gateway (Auth, Rate Limit, TLS Termination)"]
-    end
-
-    subgraph "Chat Layer"
-        CS1["Chat Server Pod 1\n(Erlang/BEAM)"]
-        CS2["Chat Server Pod 2"]
-        CSN["Chat Server Pod N"]
-    end
-
-    subgraph "Messaging Backbone"
-        Kafka["Apache Kafka\n(Partitioned by chat_id)"]
-        DS["Delivery Service"]
-        FO["Fan-out Worker\n(Group Messages)"]
-        NS["Notification Service\n(FCM / APNs)"]
-    end
-
-    subgraph "Storage Layer"
-        Redis["Redis Cluster\n(Sessions + Presence)"]
-        Cassandra["Cassandra Ring\n(Pending Messages)"]
-        MySQL["MySQL Shards\n(Users + Groups)"]
-        S3["Object Storage\n(Encrypted Media)"]
-    end
-
-    subgraph "Support Services"
-        Auth["Auth Service\n(OTP + JWT)"]
-        Media["Media Service"]
-        Presence["Presence Service"]
-        KeySvc["Key Distribution Service\n(Signal Protocol)"]
-        Analytics["Analytics Pipeline\n(Flink + ClickHouse)"]
-    end
-
-    iOS & Android & Web --> DNS
-    DNS --> WAF --> LB --> AG
-    AG --> CS1 & CS2 & CSN
-    CS1 & CS2 & CSN --> Kafka
-    Kafka --> DS & FO & NS & Analytics
-    DS --> Redis
-    DS --> Cassandra
-    DS --> CS1 & CS2 & CSN
-    FO --> DS
-    NS --> FCM["FCM / APNs"]
-    CS1 & CS2 & CSN --> Auth
-    CS1 & CS2 & CSN --> KeySvc
-    iOS & Android --> CDN
-    iOS & Android --> Media --> S3
-    Media --> CDN
-    MySQL --> Redis
+flowchart LR
+    Receipt[Read Receipt from Client] --> WS[WebSocket Service]
+    WS --> Redis[(Redis Status Cache)]
+    WS --> Cass[(Cassandra Permanent)]
+    Redis -->|DEL status key| Evict[Evict cached delivered status]
+    Cass -->|persist read status| Store[Durable record]
 ```
 
----
+**Cache invalidation summary:**
 
-## Key Takeaways
+| Cache | Strategy | Invalidation Trigger | Pattern |
+|---|---|---|---|
+| Session registry | TTL 90s + heartbeat refresh | On reconnect (overwrite) | TTL + lazy overwrite |
+| Presence | TTL 60s + heartbeat refresh | On graceful disconnect (DEL) | TTL + explicit delete |
+| Group membership | TTL 300s | On member join/leave (DEL) | Cache-aside + write-through delete |
+| Delivery status | TTL 7 days | On status upgrade to `read` (DEL) | Explicit delete on state transition |
 
-1. **Persistent connections are non-negotiable** for real-time messaging. WebSocket + event-driven servers (Erlang, Netty, Node.js) are the right tools.
-
-2. **Decouple ingestion from delivery with Kafka.** The sender's ACK should be immediate; actual delivery is async. This improves perceived latency and system resilience.
-
-3. **Redis as a routing table** is the elegant solution to the multi-server connection problem. The Session Cache pattern (`user_id → server_id`) is reusable across many real-time systems.
-
-4. **Cassandra's data model is a perfect fit** for inbox-style workloads. Model your partition key around your primary access pattern.
-
-5. **Fan-out is the core scaling challenge** in group messaging. Write fan-out (eager) is simple but expensive at scale. Read fan-out (lazy) is complex but efficient.
-
-6. **E2E encryption is a UX and security feature.** The Signal Protocol proves that strong encryption can be practical at scale.
-
-7. **Presence is expensive and eventually consistent by design.** Don't fight the CAP theorem — embrace eventual consistency for non-critical features.
-
-8. **Circuit breakers and retry logic** are the difference between a 5-minute outage and a 5-hour cascade failure.
-
-9. **Media is a separate concern** from messaging. Separate the media service, use CDN aggressively, and never send media inline through your chat pipeline.
-
-10. **Multi-region is not optional** for a global messaging platform. Design for cross-DC replication from day one.
+**Stampede protection:** When a hot group's cache expires (group with 1,024 members, active conversation), multiple concurrent messages can simultaneously miss and each trigger a PostgreSQL read. Solution: Redis `SET lock:grp:{group_id} 1 NX EX 2` — the first miss holds the lock, others wait 50ms and retry the cache.
 
 ---
 
-## Interview Tips
+### 3. WebSocket Routing at Scale
 
-### Common Follow-Up Questions
+WebSocket connections are stateful — each client holds a persistent TCP connection to a **specific server instance**. When Kafka delivers a message for Alice, it must know which of 5,000 WebSocket servers she is connected to.
 
-> **"How would you handle message ordering in a distributed system?"**
-- Use TIMEUUID as message IDs (naturally sortable)
-- Route all messages for a given chat to the same Kafka partition
-- Client-side sequence numbers for optimistic ordering
+**Solution: Redis session registry lookup**
 
-> **"What happens when a chat server crashes mid-delivery?"**
-- Session TTL expires in Redis (30s)
-- Delivery Service detects offline state, buffers in Cassandra
-- Client reconnects to a different server, flushes buffered messages
+```mermaid
+sequenceDiagram
+    participant FO as Fan-out Service
+    participant R as Redis Session Registry
+    participant WS3 as ws-server-3
+    participant A as Alice Device
 
-> **"How do you scale to 1 billion group messages per day?"**
-- Async fan-out via Kafka
-- Batch deliveries per destination server
-- Tiered strategy: eager for small groups, lazy for large groups
+    FO->>R: GET ws:session:alice_id
+    R-->>FO: server_id = ws-server-3
+    FO->>WS3: gRPC forward delivery event
+    WS3->>A: Push via WebSocket
+    A-->>WS3: ACK delivered
+```
 
-> **"How do you prevent duplicate messages?"**
-- Client-generated idempotency key (`client_message_id`)
-- Server checks for existing record before processing
-- Kafka consumer groups with `enable.auto.commit=false` + manual ACK
+**Scaling:** WebSocket servers are stateless in business logic — they hold raw TCP connections but carry no application state. Adding new servers requires zero migration. The Redis Cluster handles 10M+ session lookups/sec comfortably.
 
-> **"How would you design read receipts?"**
-- Client sends `READ` event over WebSocket when message is visible on screen
-- Server publishes to Kafka receipt topic
-- Asynchronously delivered back to original sender
-
-> **"How do you implement message search?"**
-- On-device search (WhatsApp's actual approach — no server-side content search due to E2E encryption)
-- Optionally: Elasticsearch index for metadata (sender, timestamp, group) — never for content
-
-### What Interviewers Expect
-
-- ✅ Start with requirements clarification — don't jump to design
-- ✅ Drive capacity estimation before architecture
-- ✅ Explain WHY you chose each technology
-- ✅ Acknowledge tradeoffs explicitly
-- ✅ Discuss failure scenarios proactively
-- ✅ Mention E2E encryption as a first-class concern, not an afterthought
-
-### Mistakes Candidates Make
-
-- ❌ Using a single database for everything
-- ❌ Polling instead of persistent connections
-- ❌ Forgetting offline message buffering
-- ❌ Ignoring the fan-out problem in groups
-- ❌ Not discussing the CAP theorem implications
-- ❌ Treating presence as a simple read/write problem
-- ❌ Skipping idempotency (duplicate message handling)
-- ❌ Designing for 1M users when the question asks for 2 billion
+**Tradeoff:** One extra Redis roundtrip (~1ms) per message delivery. At 1.15M msg/sec, this is 1.15M Redis reads/sec — within cluster capacity but uses ~12% of latency budget.
 
 ---
 
-*This design is inspired by publicly available engineering blogs from Meta, WhatsApp Engineering, the Signal Protocol specification, and distributed systems literature. Real implementations involve additional complexity and proprietary optimizations.*
+### 4. Group Message Fan-out
+
+A 1,024-member group message must deliver to 1,023 recipients. The write amplification is:
+- 100B messages/day; 30% are group messages to average 50-member groups
+- 30B × 50 = **1.5 trillion delivery operations/day**
+
+Writing 1,023 rows synchronously in the Message Service is catastrophically slow. A dedicated fan-out pipeline solves this:
+
+```mermaid
+flowchart TD
+    MS[Message Service] -->|1 event| K1[Kafka messages topic]
+    K1 --> FO[Fan-out Service]
+    FO -->|reads from cache| Redis[(Redis Group Member Cache)]
+    FO -->|1 event per member| K2[Kafka delivery.events topic]
+    K2 --> WS[WebSocket Service]
+    K2 --> NS[Notification Service]
+```
+
+The Fan-out Service is horizontally scalable — add more consumers to increase throughput. For max-size groups (1,024 members), last-member delivery may lag 200–500ms behind first — WhatsApp explicitly accepts this. The alternative (synchronous fan-out in the write path) would stall the sender's `201 OK` for seconds.
+
+---
+
+### 5. Message Ordering: Solving Clock Skew
+
+Cassandra clusters messages by `(sent_at, message_seq)`. Device clocks drift — two messages sent 1ms apart on different phones may arrive with identical or inverted `sent_at` values. Without a server-side tiebreaker, conversations render out of order.
+
+**Solution: Server-assigned monotonic sequence per chat**
+
+```
+message_seq = INCR msg:seq:{chat_id}   ← Redis atomic increment
+```
+
+Every message write includes one Redis `INCR` — adds ~1ms to the write path but guarantees total ordering even under concurrent sends.
+
+**Hot key concern:** `msg:seq:{chat_id}` is hit on every message write to that chat. A 1,024-member group with 100 messages/sec creates a hot Redis key. Redis single-threaded per slot handles ~100K INCR/sec per slot — sufficient for any realistic chat workload.
+
+---
+
+### 6. Offline Delivery and Inbox Cursor
+
+When a user is offline, messages accumulate in the `pending_delivery` Cassandra table. On reconnect, the client sends its last cursor:
+
+```mermaid
+sequenceDiagram
+    participant Bob as Bob (Sender)
+    participant MS as Message Service
+    participant K as Kafka
+    participant NS as Notification Service
+    participant Alice as Alice (Offline to Online)
+
+    Bob->>MS: Send message to Alice
+    MS->>Cassandra: Persist in messages + pending_delivery
+    MS->>K: Publish event
+    K-->>NS: Alice is offline
+    NS->>FCM: Push notification (wake signal only)
+    Note over Alice: Alice opens WhatsApp
+    Alice->>WS: WebSocket connect + last_cursor timestamp
+    WS->>Cassandra: SELECT WHERE recipient_id=alice AND sent_at > cursor
+    WS-->>Alice: Bulk deliver missed messages in order
+    Alice-->>WS: ACK each message
+    WS->>Cassandra: DELETE from pending_delivery
+```
+
+**Push is a wake signal, not a payload carrier.** The push notification contains only a session token and badge count — not message content. The client fetches actual messages via inbox cursor on reconnect. This avoids:
+- Double delivery bugs (push + WebSocket both deliver the same message)
+- Push payload size limits (FCM max 4 KB per notification)
+- Decryption on the notification layer (messages are E2E encrypted; decryption must happen on-device)
+
+---
+
+### 7. Rate Limiting
+
+| Tier | Limit | Mechanism | Scope |
+|---|---|---|---|
+| Per user (text) | 60 messages/min | Token bucket in Redis | Prevents spam accounts |
+| Per user (media) | 15 media/min | Token bucket in Redis | Limits storage abuse |
+| Per group sender | 30 messages/min | Token bucket keyed by `(group_id, sender_id)` | Controls group flooding |
+| Per IP (unauthenticated) | 200 requests/min | Sliding window in Redis | Blocks credential stuffing |
+
+Rate limiting is enforced at the API Gateway before requests reach any service — rate-limited requests never touch Cassandra or Kafka.
+
+---
+
+### 8. Multi-Region Deployment
+
+Single-region deployment creates unacceptable latency for geographically distant users and fails GDPR data residency requirements.
+
+```mermaid
+flowchart TD
+    subgraph US-EAST
+        US_WS[WebSocket Cluster]
+        US_MS[Message Service]
+        US_C[(Cassandra Primary DC)]
+        US_K[Kafka Cluster]
+    end
+    subgraph EU-WEST
+        EU_WS[WebSocket Cluster]
+        EU_MS[Message Service]
+        EU_C[(Cassandra Replica DC)]
+        EU_K[Kafka Cluster]
+    end
+
+    US_C <-->|Cassandra Multi-DC async replication| EU_C
+    US_K <-->|Kafka MirrorMaker 2| EU_K
+```
+
+**Strategy:**
+- Users are **homed** to a region at registration based on phone number country code
+- All writes for a user route to their home region's Cassandra primary (RF=3 per DC, `LOCAL_QUORUM`)
+- Cross-region messages write to sender's home region; Multi-DC replication propagates asynchronously
+- Kafka MirrorMaker 2 replicates topics for DR and cross-region notification routing
+
+**GDPR compliance:** EU user messages are written exclusively to EU-based Cassandra nodes, configured with `NetworkTopologyStrategy` and EU-only RF. They never leave the region as primaries.
+
+---
+
+## Summary: Key Engineering Decisions
+
+| Decision | Choice | Why |
+|---|---|---|
+| Real-time transport | WebSocket | Bidirectional, persistent, low per-message overhead vs HTTP polling |
+| Message store | Cassandra (TWCS, partitioned by `chat_id`) | Append-only time-series; no cross-node joins for history |
+| Message bus | Kafka (partitioned by `chat_id`) | Decouples ingestion from delivery; preserves per-chat ordering |
+| Session routing | Redis session registry | O(1) lookup; TTL lifecycle; survives server restarts |
+| Group membership | Redis cache-aside (TTL 5min, DEL on change) | Avoids PostgreSQL scan on every fan-out; consistent after invalidation |
+| Media storage | S3 + CDN with pre-signed URLs | Binary off app servers; SHA256 dedup; edge delivery |
+| Fan-out strategy | Two-stage via dedicated Fan-out Service | Avoids write amplification at ingestion; independently scalable |
+| Message ordering | Redis INCR sequence per chat | Total order tiebreaker; solves device clock skew |
+| Offline delivery | `pending_delivery` table + cursor-based sync | Zero message loss; push is wake signal only |
+| Multi-region | Cassandra Multi-DC + Kafka MirrorMaker 2 | Latency, GDPR data residency, disaster recovery |
+
+The core principle: **separate concerns so each subsystem scales independently.** Message ingestion, delivery, fan-out, presence, and notifications are all decoupled — connected only through Kafka events and Redis state. This is the architecture that turns a simple chat app into a system that delivers 100 billion messages a day without dropping one.
