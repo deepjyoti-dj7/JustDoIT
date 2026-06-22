@@ -27,6 +27,7 @@ const mainSectionHrefs = new Set([
   "/system-design/hld",
   "/system-design/lld",
   "/dsa",
+  "/stack",
 ]);
 
 export function Sidebar({ onNavigate }: SidebarProps) {

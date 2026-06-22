@@ -1,4 +1,4 @@
-import { ArrowRight, Layers, Database, Code2 } from "lucide-react";
+import { ArrowRight, Layers, Database, Code2, Server } from "lucide-react";
 import { useSidebarContext } from "@/components/layout/SidebarContext";
 
 const sections = [
@@ -28,6 +28,15 @@ const sections = [
     href: "/dsa",
     accent: "text-violet-500 dark:text-violet-400",
     bg: "bg-violet-50 dark:bg-violet-950/40",
+  },
+  {
+    icon: Server,
+    title: "The Stack",
+    description:
+      "Kafka, Redis, Docker, Kubernetes, cloud and many more — the production tools every developer needs to know.",
+    href: "/stack",
+    accent: "text-sky-500 dark:text-sky-400",
+    bg: "bg-sky-50 dark:bg-sky-950/40",
   },
 ];
 
@@ -61,13 +70,13 @@ export function Hero() {
       </p>
 
       {/* Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         {sections.map(
           ({ icon: Icon, title, description, href, accent, bg }) => (
             <button
               key={href}
               onClick={() => handleCardClick(href)}
-              className="group flex flex-col gap-4 rounded-xl border border-zinc-200 p-6 text-left transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-lg dark:border-zinc-800 dark:hover:border-zinc-700 sm:last:col-span-1"
+              className="group flex flex-col gap-4 rounded-xl border border-zinc-200 p-6 text-left transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-lg dark:border-zinc-800 dark:hover:border-zinc-700"
             >
               <div className={`w-fit rounded-lg p-2.5 ${bg}`}>
                 <Icon className={`h-5 w-5 ${accent}`} />
@@ -95,7 +104,7 @@ export function Hero() {
       <div className="mt-16 flex flex-wrap gap-8 border-t border-zinc-200 pt-8 dark:border-zinc-800">
         {[
           { value: "400+", label: "Topics covered" },
-          { value: "3", label: "Major domains" },
+          { value: "4", label: "Major domains" },
           { value: "150+", label: "Coding problems" },
           { value: "∞", label: "Interviews aced" },
         ].map(({ value, label }) => (

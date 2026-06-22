@@ -112,11 +112,18 @@ const palette: Record<
     accent: "text-violet-600 dark:text-violet-400",
     border: "border-zinc-200 dark:border-zinc-800",
   },
+  stack: {
+    heading: "text-sky-500 dark:text-sky-400",
+    badge: "bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400",
+    accent: "text-sky-600 dark:text-sky-400",
+    border: "border-zinc-200 dark:border-zinc-800",
+  },
 };
 
 function getPalette(pathname: string) {
   if (pathname.includes("/lld")) return palette.lld;
   if (pathname.includes("/dsa")) return palette.dsa;
+  if (pathname.includes("/stack")) return palette.stack;
   return palette.hld;
 }
 

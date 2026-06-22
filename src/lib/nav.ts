@@ -975,7 +975,6 @@ export const navigation: NavItem[] = [
               },
             ],
           },
-
           {
             title: "Concurrency & Thread Safety",
             children: [
@@ -1190,6 +1189,143 @@ export const navigation: NavItem[] = [
         ],
       },
       {
+        title: "Hashing",
+        children: [
+          { title: "Hash Maps", href: "/dsa/hashing/hash-maps" },
+          { title: "Hash Sets", href: "/dsa/hashing/hash-sets" },
+          {
+            title: "Collision Resolution",
+            href: "/dsa/hashing/collision-resolution",
+          },
+          {
+            title: "Problems",
+            children: [
+              { title: "Two Sum", href: "/dsa/hashing/problems/two-sum" },
+              {
+                title: "Longest Consecutive Sequence",
+                href: "/dsa/hashing/problems/longest-consecutive-sequence",
+              },
+              {
+                title: "Top K Frequent Elements",
+                href: "/dsa/hashing/problems/top-k-frequent-elements",
+              },
+              {
+                title: "Valid Sudoku",
+                href: "/dsa/hashing/problems/valid-sudoku",
+              },
+              {
+                title: "Group Anagrams",
+                href: "/dsa/hashing/problems/group-anagrams",
+              },
+              {
+                title: "Encode and Decode Strings",
+                href: "/dsa/hashing/problems/encode-decode-strings",
+              },
+              {
+                title: "First Missing Positive",
+                href: "/dsa/hashing/problems/first-missing-positive",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: "Sorting",
+        children: [
+          {
+            title: "Bubble, Selection & Insertion",
+            href: "/dsa/sorting/bubble-selection-insertion",
+          },
+          { title: "Merge Sort", href: "/dsa/sorting/merge-sort" },
+          { title: "Quick Sort", href: "/dsa/sorting/quick-sort" },
+          { title: "Heap Sort", href: "/dsa/sorting/heap-sort" },
+          {
+            title: "Counting, Radix & Bucket Sort",
+            href: "/dsa/sorting/counting-radix-bucket",
+          },
+          {
+            title: "Sorting Comparison",
+            href: "/dsa/sorting/sorting-comparison",
+          },
+          {
+            title: "Problems",
+            children: [
+              {
+                title: "Sort Colors (Dutch National Flag)",
+                href: "/dsa/sorting/problems/sort-colors",
+              },
+              {
+                title: "Merge Intervals",
+                href: "/dsa/sorting/problems/merge-intervals",
+              },
+              {
+                title: "Insert Interval",
+                href: "/dsa/sorting/problems/insert-interval",
+              },
+              {
+                title: "Non-overlapping Intervals",
+                href: "/dsa/sorting/problems/non-overlapping-intervals",
+              },
+              {
+                title: "Largest Number",
+                href: "/dsa/sorting/problems/largest-number",
+              },
+              {
+                title: "Meeting Rooms",
+                href: "/dsa/sorting/problems/meeting-rooms",
+              },
+              {
+                title: "Meeting Rooms II",
+                href: "/dsa/sorting/problems/meeting-rooms-ii",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: "Searching",
+        children: [
+          { title: "Binary Search", href: "/dsa/searching/binary-search" },
+          {
+            title: "Binary Search Variants",
+            href: "/dsa/searching/binary-search-variants",
+          },
+          {
+            title: "Problems",
+            children: [
+              {
+                title: "Binary Search",
+                href: "/dsa/searching/problems/binary-search-basic",
+              },
+              {
+                title: "Search a 2D Matrix",
+                href: "/dsa/searching/problems/search-2d-matrix",
+              },
+              {
+                title: "Koko Eating Bananas",
+                href: "/dsa/searching/problems/koko-eating-bananas",
+              },
+              {
+                title: "Find Minimum in Rotated Sorted Array",
+                href: "/dsa/searching/problems/find-minimum-rotated",
+              },
+              {
+                title: "Search in Rotated Sorted Array",
+                href: "/dsa/searching/problems/search-rotated-array",
+              },
+              {
+                title: "Time Based Key-Value Store",
+                href: "/dsa/searching/problems/time-based-key-value",
+              },
+              {
+                title: "Median of Two Sorted Arrays",
+                href: "/dsa/searching/problems/median-two-sorted-arrays",
+              },
+            ],
+          },
+        ],
+      },
+      {
         title: "Linked Lists",
         children: [
           {
@@ -1309,41 +1445,62 @@ export const navigation: NavItem[] = [
         ],
       },
       {
-        title: "Hashing",
+        title: "Recursion & Backtracking",
         children: [
-          { title: "Hash Maps", href: "/dsa/hashing/hash-maps" },
-          { title: "Hash Sets", href: "/dsa/hashing/hash-sets" },
           {
-            title: "Collision Resolution",
-            href: "/dsa/hashing/collision-resolution",
+            title: "Recursion Fundamentals",
+            href: "/dsa/recursion-backtracking/recursion-fundamentals",
+          },
+          {
+            title: "Backtracking",
+            href: "/dsa/recursion-backtracking/backtracking",
+          },
+          {
+            title: "Classic Backtracking Problems",
+            href: "/dsa/recursion-backtracking/classic-backtracking-problems",
           },
           {
             title: "Problems",
             children: [
-              { title: "Two Sum", href: "/dsa/hashing/problems/two-sum" },
               {
-                title: "Longest Consecutive Sequence",
-                href: "/dsa/hashing/problems/longest-consecutive-sequence",
+                title: "Subsets",
+                href: "/dsa/recursion-backtracking/problems/subsets",
               },
               {
-                title: "Top K Frequent Elements",
-                href: "/dsa/hashing/problems/top-k-frequent-elements",
+                title: "Subsets II",
+                href: "/dsa/recursion-backtracking/problems/subsets-ii",
               },
               {
-                title: "Valid Sudoku",
-                href: "/dsa/hashing/problems/valid-sudoku",
+                title: "Combination Sum",
+                href: "/dsa/recursion-backtracking/problems/combination-sum",
               },
               {
-                title: "Group Anagrams",
-                href: "/dsa/hashing/problems/group-anagrams",
+                title: "Combination Sum II",
+                href: "/dsa/recursion-backtracking/problems/combination-sum-ii",
               },
               {
-                title: "Encode and Decode Strings",
-                href: "/dsa/hashing/problems/encode-decode-strings",
+                title: "Permutations",
+                href: "/dsa/recursion-backtracking/problems/permutations",
               },
               {
-                title: "First Missing Positive",
-                href: "/dsa/hashing/problems/first-missing-positive",
+                title: "Word Search",
+                href: "/dsa/recursion-backtracking/problems/word-search",
+              },
+              {
+                title: "Palindrome Partitioning",
+                href: "/dsa/recursion-backtracking/problems/palindrome-partitioning",
+              },
+              {
+                title: "Letter Combinations of Phone Number",
+                href: "/dsa/recursion-backtracking/problems/letter-combinations-phone",
+              },
+              {
+                title: "N-Queens",
+                href: "/dsa/recursion-backtracking/problems/n-queens",
+              },
+              {
+                title: "Sudoku Solver",
+                href: "/dsa/recursion-backtracking/problems/sudoku-solver",
               },
             ],
           },
@@ -1468,32 +1625,88 @@ export const navigation: NavItem[] = [
         ],
       },
       {
-        title: "Tries",
+        title: "Intervals",
         children: [
-          { title: "Trie (Prefix Tree)", href: "/dsa/tries/trie-prefix-tree" },
-          { title: "Trie Applications", href: "/dsa/tries/trie-applications" },
+          { title: "Merge Intervals", href: "/dsa/intervals/merge-intervals" },
+          {
+            title: "Interval Problem Patterns",
+            href: "/dsa/intervals/interval-problems",
+          },
           {
             title: "Problems",
             children: [
               {
-                title: "Implement Trie",
-                href: "/dsa/tries/problems/implement-trie",
+                title: "Merge Intervals",
+                href: "/dsa/intervals/problems/merge-intervals",
               },
               {
-                title: "Design Add and Search Words",
-                href: "/dsa/tries/problems/design-add-search-words",
+                title: "Insert Interval",
+                href: "/dsa/intervals/problems/insert-interval",
               },
               {
-                title: "Word Search II",
-                href: "/dsa/tries/problems/word-search-ii",
+                title: "Non-overlapping Intervals",
+                href: "/dsa/intervals/problems/non-overlapping-intervals",
               },
               {
-                title: "Replace Words",
-                href: "/dsa/tries/problems/replace-words",
+                title: "Meeting Rooms",
+                href: "/dsa/intervals/problems/meeting-rooms",
               },
               {
-                title: "Maximum XOR of Two Numbers",
-                href: "/dsa/tries/problems/maximum-xor-two-numbers",
+                title: "Meeting Rooms II",
+                href: "/dsa/intervals/problems/meeting-rooms-ii",
+              },
+              {
+                title: "Minimum Number of Arrows to Burst Balloons",
+                href: "/dsa/intervals/problems/minimum-arrows",
+              },
+              {
+                title: "Employee Free Time",
+                href: "/dsa/intervals/problems/employee-free-time",
+              },
+            ],
+          },
+        ],
+      },
+      {
+        title: "Greedy",
+        children: [
+          {
+            title: "Greedy Fundamentals",
+            href: "/dsa/greedy/greedy-fundamentals",
+          },
+          {
+            title: "Interval Scheduling",
+            href: "/dsa/greedy/interval-scheduling",
+          },
+          { title: "Huffman Coding", href: "/dsa/greedy/huffman-coding" },
+          {
+            title: "Problems",
+            children: [
+              { title: "Jump Game", href: "/dsa/greedy/problems/jump-game" },
+              {
+                title: "Jump Game II",
+                href: "/dsa/greedy/problems/jump-game-ii",
+              },
+              {
+                title: "Gas Station",
+                href: "/dsa/greedy/problems/gas-station",
+              },
+              {
+                title: "Hand of Straights",
+                href: "/dsa/greedy/problems/hand-of-straights",
+              },
+              {
+                title: "Partition Labels",
+                href: "/dsa/greedy/problems/partition-labels",
+              },
+              {
+                title: "Valid Parenthesis String",
+                href: "/dsa/greedy/problems/valid-parenthesis-string",
+              },
+              { title: "Candy", href: "/dsa/greedy/problems/candy" },
+              {
+                title: "Non-overlapping Intervals",
+                href: "/dsa/greedy/problems/non-overlapping-intervals",
               },
             ],
           },
@@ -1578,158 +1791,32 @@ export const navigation: NavItem[] = [
         ],
       },
       {
-        title: "Sorting",
+        title: "Tries",
         children: [
-          {
-            title: "Bubble, Selection & Insertion",
-            href: "/dsa/sorting/bubble-selection-insertion",
-          },
-          { title: "Merge Sort", href: "/dsa/sorting/merge-sort" },
-          { title: "Quick Sort", href: "/dsa/sorting/quick-sort" },
-          { title: "Heap Sort", href: "/dsa/sorting/heap-sort" },
-          {
-            title: "Counting, Radix & Bucket Sort",
-            href: "/dsa/sorting/counting-radix-bucket",
-          },
-          {
-            title: "Sorting Comparison",
-            href: "/dsa/sorting/sorting-comparison",
-          },
+          { title: "Trie (Prefix Tree)", href: "/dsa/tries/trie-prefix-tree" },
+          { title: "Trie Applications", href: "/dsa/tries/trie-applications" },
           {
             title: "Problems",
             children: [
               {
-                title: "Sort Colors (Dutch National Flag)",
-                href: "/dsa/sorting/problems/sort-colors",
+                title: "Implement Trie",
+                href: "/dsa/tries/problems/implement-trie",
               },
               {
-                title: "Merge Intervals",
-                href: "/dsa/sorting/problems/merge-intervals",
+                title: "Design Add and Search Words",
+                href: "/dsa/tries/problems/design-add-search-words",
               },
               {
-                title: "Insert Interval",
-                href: "/dsa/sorting/problems/insert-interval",
+                title: "Word Search II",
+                href: "/dsa/tries/problems/word-search-ii",
               },
               {
-                title: "Non-overlapping Intervals",
-                href: "/dsa/sorting/problems/non-overlapping-intervals",
+                title: "Replace Words",
+                href: "/dsa/tries/problems/replace-words",
               },
               {
-                title: "Largest Number",
-                href: "/dsa/sorting/problems/largest-number",
-              },
-              {
-                title: "Meeting Rooms",
-                href: "/dsa/sorting/problems/meeting-rooms",
-              },
-              {
-                title: "Meeting Rooms II",
-                href: "/dsa/sorting/problems/meeting-rooms-ii",
-              },
-            ],
-          },
-        ],
-      },
-      {
-        title: "Searching",
-        children: [
-          { title: "Binary Search", href: "/dsa/searching/binary-search" },
-          {
-            title: "Binary Search Variants",
-            href: "/dsa/searching/binary-search-variants",
-          },
-          {
-            title: "Problems",
-            children: [
-              {
-                title: "Binary Search",
-                href: "/dsa/searching/problems/binary-search-basic",
-              },
-              {
-                title: "Search a 2D Matrix",
-                href: "/dsa/searching/problems/search-2d-matrix",
-              },
-              {
-                title: "Koko Eating Bananas",
-                href: "/dsa/searching/problems/koko-eating-bananas",
-              },
-              {
-                title: "Find Minimum in Rotated Sorted Array",
-                href: "/dsa/searching/problems/find-minimum-rotated",
-              },
-              {
-                title: "Search in Rotated Sorted Array",
-                href: "/dsa/searching/problems/search-rotated-array",
-              },
-              {
-                title: "Time Based Key-Value Store",
-                href: "/dsa/searching/problems/time-based-key-value",
-              },
-              {
-                title: "Median of Two Sorted Arrays",
-                href: "/dsa/searching/problems/median-two-sorted-arrays",
-              },
-            ],
-          },
-        ],
-      },
-      {
-        title: "Recursion & Backtracking",
-        children: [
-          {
-            title: "Recursion Fundamentals",
-            href: "/dsa/recursion-backtracking/recursion-fundamentals",
-          },
-          {
-            title: "Backtracking",
-            href: "/dsa/recursion-backtracking/backtracking",
-          },
-          {
-            title: "Classic Backtracking Problems",
-            href: "/dsa/recursion-backtracking/classic-backtracking-problems",
-          },
-          {
-            title: "Problems",
-            children: [
-              {
-                title: "Subsets",
-                href: "/dsa/recursion-backtracking/problems/subsets",
-              },
-              {
-                title: "Subsets II",
-                href: "/dsa/recursion-backtracking/problems/subsets-ii",
-              },
-              {
-                title: "Combination Sum",
-                href: "/dsa/recursion-backtracking/problems/combination-sum",
-              },
-              {
-                title: "Combination Sum II",
-                href: "/dsa/recursion-backtracking/problems/combination-sum-ii",
-              },
-              {
-                title: "Permutations",
-                href: "/dsa/recursion-backtracking/problems/permutations",
-              },
-              {
-                title: "Word Search",
-                href: "/dsa/recursion-backtracking/problems/word-search",
-              },
-              {
-                title: "Palindrome Partitioning",
-                href: "/dsa/recursion-backtracking/problems/palindrome-partitioning",
-              },
-              {
-                title: "Letter Combinations of Phone Number",
-                href: "/dsa/recursion-backtracking/problems/letter-combinations-phone",
-              },
-              {
-                title: "N-Queens",
-                href: "/dsa/recursion-backtracking/problems/n-queens",
-              },
-              {
-                title: "Sudoku Solver",
-                href: "/dsa/recursion-backtracking/problems/sudoku-solver",
+                title: "Maximum XOR of Two Numbers",
+                href: "/dsa/tries/problems/maximum-xor-two-numbers",
               },
             ],
           },
@@ -1820,51 +1907,6 @@ export const navigation: NavItem[] = [
               {
                 title: "Regular Expression Matching",
                 href: "/dsa/dynamic-programming/problems/regular-expression-matching",
-              },
-            ],
-          },
-        ],
-      },
-      {
-        title: "Greedy",
-        children: [
-          {
-            title: "Greedy Fundamentals",
-            href: "/dsa/greedy/greedy-fundamentals",
-          },
-          {
-            title: "Interval Scheduling",
-            href: "/dsa/greedy/interval-scheduling",
-          },
-          { title: "Huffman Coding", href: "/dsa/greedy/huffman-coding" },
-          {
-            title: "Problems",
-            children: [
-              { title: "Jump Game", href: "/dsa/greedy/problems/jump-game" },
-              {
-                title: "Jump Game II",
-                href: "/dsa/greedy/problems/jump-game-ii",
-              },
-              {
-                title: "Gas Station",
-                href: "/dsa/greedy/problems/gas-station",
-              },
-              {
-                title: "Hand of Straights",
-                href: "/dsa/greedy/problems/hand-of-straights",
-              },
-              {
-                title: "Partition Labels",
-                href: "/dsa/greedy/problems/partition-labels",
-              },
-              {
-                title: "Valid Parenthesis String",
-                href: "/dsa/greedy/problems/valid-parenthesis-string",
-              },
-              { title: "Candy", href: "/dsa/greedy/problems/candy" },
-              {
-                title: "Non-overlapping Intervals",
-                href: "/dsa/greedy/problems/non-overlapping-intervals",
               },
             ],
           },
@@ -2006,49 +2048,6 @@ export const navigation: NavItem[] = [
         ],
       },
       {
-        title: "Intervals",
-        children: [
-          { title: "Merge Intervals", href: "/dsa/intervals/merge-intervals" },
-          {
-            title: "Interval Problem Patterns",
-            href: "/dsa/intervals/interval-problems",
-          },
-          {
-            title: "Problems",
-            children: [
-              {
-                title: "Merge Intervals",
-                href: "/dsa/intervals/problems/merge-intervals",
-              },
-              {
-                title: "Insert Interval",
-                href: "/dsa/intervals/problems/insert-interval",
-              },
-              {
-                title: "Non-overlapping Intervals",
-                href: "/dsa/intervals/problems/non-overlapping-intervals",
-              },
-              {
-                title: "Meeting Rooms",
-                href: "/dsa/intervals/problems/meeting-rooms",
-              },
-              {
-                title: "Meeting Rooms II",
-                href: "/dsa/intervals/problems/meeting-rooms-ii",
-              },
-              {
-                title: "Minimum Number of Arrows to Burst Balloons",
-                href: "/dsa/intervals/problems/minimum-arrows",
-              },
-              {
-                title: "Employee Free Time",
-                href: "/dsa/intervals/problems/employee-free-time",
-              },
-            ],
-          },
-        ],
-      },
-      {
         title: "Interview Prep",
         children: [
           {
@@ -2068,8 +2067,231 @@ export const navigation: NavItem[] = [
       },
     ],
   },
+  {
+    title: "The Stack",
+    href: "/stack",
+    children: [
+      {
+        title: "Java",
+        href: "/stack/java",
+        children: [
+          { title: "Fundamentals", href: "/stack/java/fundamentals" },
+          { title: "Collections", href: "/stack/java/collections" },
+          { title: "Concurrency", href: "/stack/java/concurrency" },
+          { title: "Modern Java", href: "/stack/java/modern-java" },
+        ],
+      },
+      {
+        title: "Spring Boot",
+        href: "/stack/spring-boot",
+        children: [
+          { title: "Fundamentals", href: "/stack/spring-boot/fundamentals" },
+          { title: "Web Layer", href: "/stack/spring-boot/web-layer" },
+          { title: "Data Layer", href: "/stack/spring-boot/data-layer" },
+          { title: "Security", href: "/stack/spring-boot/security" },
+          { title: "Testing", href: "/stack/spring-boot/testing" },
+          { title: "Concurrency", href: "/stack/spring-boot/concurrency" },
+          {
+            title: "Production Patterns",
+            href: "/stack/spring-boot/production-patterns",
+          },
+        ],
+      },
+      {
+        title: "Node.js",
+        href: "/stack/nodejs",
+        children: [
+          { title: "Fundamentals", href: "/stack/nodejs/fundamentals" },
+          { title: "Core Concepts", href: "/stack/nodejs/core-concepts" },
+          { title: "Web Servers", href: "/stack/nodejs/web-servers" },
+          { title: "Data & Auth", href: "/stack/nodejs/data-and-auth" },
+          { title: "Concurrency", href: "/stack/nodejs/concurrency" },
+          {
+            title: "Production Patterns",
+            href: "/stack/nodejs/production-patterns",
+          },
+        ],
+      },
+      {
+        title: "React + Redux",
+        href: "/stack/react-redux",
+        children: [
+          {
+            title: "React Fundamentals",
+            href: "/stack/react-redux/react-fundamentals",
+          },
+          {
+            title: "Advanced React",
+            href: "/stack/react-redux/advanced-react",
+          },
+          { title: "Redux", href: "/stack/react-redux/redux" },
+          {
+            title: "Routing & Forms",
+            href: "/stack/react-redux/routing-and-forms",
+          },
+          {
+            title: "Production Patterns",
+            href: "/stack/react-redux/production-patterns",
+          },
+        ],
+      },
+      {
+        title: "SQL",
+        href: "/stack/sql",
+        children: [
+          { title: "Fundamentals", href: "/stack/sql/fundamentals" },
+          { title: "Queries", href: "/stack/sql/queries" },
+          { title: "Advanced SQL", href: "/stack/sql/advanced-sql" },
+          {
+            title: "Transactions & Concurrency",
+            href: "/stack/sql/transactions-and-concurrency",
+          },
+          { title: "Design Patterns", href: "/stack/sql/design-patterns" },
+          {
+            title: "Spring Boot + SQL",
+            href: "/stack/sql/spring-boot-integration",
+          },
+          { title: "Node.js + SQL", href: "/stack/sql/nodejs-integration" },
+        ],
+      },
+      {
+        title: "MongoDB",
+        href: "/stack/mongodb",
+        children: [
+          { title: "Fundamentals", href: "/stack/mongodb/fundamentals" },
+          { title: "CRUD & Queries", href: "/stack/mongodb/crud-and-queries" },
+          { title: "Aggregation", href: "/stack/mongodb/aggregation" },
+          { title: "Schema Design", href: "/stack/mongodb/schema-design" },
+          {
+            title: "Production Patterns",
+            href: "/stack/mongodb/production-patterns",
+          },
+          {
+            title: "Spring Boot + MongoDB",
+            href: "/stack/mongodb/spring-boot-integration",
+          },
+          {
+            title: "Node.js + MongoDB",
+            href: "/stack/mongodb/nodejs-integration",
+          },
+        ],
+      },
+      {
+        title: "Redis",
+        href: "/stack/redis",
+        children: [
+          { title: "Fundamentals", href: "/stack/redis/fundamentals" },
+          { title: "Data Structures", href: "/stack/redis/data-structures" },
+          { title: "Operations", href: "/stack/redis/operations" },
+          { title: "Deployment", href: "/stack/redis/deployment" },
+          {
+            title: "Production Patterns",
+            href: "/stack/redis/production-patterns",
+          },
+          { title: "AWS ElastiCache", href: "/stack/redis/aws-elasticache" },
+        ],
+      },
+      {
+        title: "Kafka",
+        href: "/stack/kafka",
+        children: [
+          { title: "Fundamentals", href: "/stack/kafka/fundamentals" },
+          { title: "Core Concepts", href: "/stack/kafka/core-concepts" },
+          { title: "Operations", href: "/stack/kafka/operations" },
+          { title: "Advanced", href: "/stack/kafka/advanced" },
+          {
+            title: "Production Patterns",
+            href: "/stack/kafka/production-patterns",
+          },
+          { title: "AWS & MSK", href: "/stack/kafka/aws-msk" },
+        ],
+      },
+      {
+        title: "Docker",
+        href: "/stack/docker",
+        children: [
+          { title: "Fundamentals", href: "/stack/docker/fundamentals" },
+          {
+            title: "Working with Docker",
+            href: "/stack/docker/working-with-docker",
+          },
+          {
+            title: "Production Patterns",
+            href: "/stack/docker/production-patterns",
+          },
+          { title: "Debugging", href: "/stack/docker/debugging" },
+        ],
+      },
+      {
+        title: "Kubernetes",
+        href: "/stack/kubernetes",
+        children: [
+          { title: "Fundamentals", href: "/stack/kubernetes/fundamentals" },
+          { title: "Core Objects", href: "/stack/kubernetes/core-objects" },
+          { title: "Networking", href: "/stack/kubernetes/networking" },
+          { title: "Storage", href: "/stack/kubernetes/storage" },
+          { title: "Configuration", href: "/stack/kubernetes/configuration" },
+          {
+            title: "Production Patterns",
+            href: "/stack/kubernetes/production-patterns",
+          },
+          { title: "AWS EKS", href: "/stack/kubernetes/aws-eks" },
+        ],
+      },
+      {
+        title: "CI/CD",
+        href: "/stack/ci-cd",
+        children: [
+          { title: "Fundamentals", href: "/stack/ci-cd/fundamentals" },
+          { title: "Tools", href: "/stack/ci-cd/tools" },
+          { title: "Patterns", href: "/stack/ci-cd/patterns" },
+          { title: "Security", href: "/stack/ci-cd/security" },
+          {
+            title: "Production Patterns",
+            href: "/stack/ci-cd/production-patterns",
+          },
+        ],
+      },
+      {
+        title: "Cloud",
+        href: "/stack/cloud",
+        children: [
+          { title: "Core Concepts", href: "/stack/cloud/core-concepts" },
+          { title: "Compute", href: "/stack/cloud/compute" },
+          { title: "Storage", href: "/stack/cloud/storage" },
+          { title: "Networking", href: "/stack/cloud/networking" },
+          { title: "Security", href: "/stack/cloud/security" },
+          { title: "Messaging", href: "/stack/cloud/messaging" },
+          { title: "Observability", href: "/stack/cloud/observability" },
+          {
+            title: "Production Patterns",
+            href: "/stack/cloud/production-patterns",
+          },
+        ],
+      },
+      {
+        title: "MCP Server",
+        href: "/stack/mcp",
+        children: [
+          { title: "Fundamentals", href: "/stack/mcp/fundamentals" },
+          { title: "Core Concepts", href: "/stack/mcp/core-concepts" },
+          {
+            title: "Building MCP Servers",
+            href: "/stack/mcp/building-servers",
+          },
+          {
+            title: "Connecting to AI Tools",
+            href: "/stack/mcp/connecting-to-ai",
+          },
+          {
+            title: "Real-World Servers",
+            href: "/stack/mcp/real-world-servers",
+          },
+        ],
+      },
+    ],
+  },
 ];
-
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 /** Flatten nav tree to ordered leaf pages (items with href but no children) */
